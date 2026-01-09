@@ -175,15 +175,12 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="text-center space-y-3">
+                    <div className="text-center">
                         <p className="text-slate-500 dark:text-slate-400">
                             Não tem uma conta?{' '}
                             <Link to="/signup" className="text-primary hover:text-primary/80 font-medium">
                                 Criar conta
                             </Link>
-                        </p>
-                        <p className="text-sm text-slate-400 dark:text-slate-500">
-                            Demo: <span className="text-slate-600 dark:text-slate-400">admin@otavio.ai</span> / <span className="text-slate-600 dark:text-slate-400">admin123</span>
                         </p>
                     </div>
                 </div>

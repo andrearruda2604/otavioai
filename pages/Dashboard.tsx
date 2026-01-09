@@ -53,7 +53,7 @@ export default function DashboardPage() {
                     </button>
                 </div>
             </header>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard title="Solicitações" value="15" trend="+12%" icon="description" color="blue" />
                 <StatCard title="Produtos" value="37" trend="+8%" icon="settings_suggest" color="purple" />
@@ -69,7 +69,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-slate-800 dark:bg-slate-400"></span>
+                            <span className="w-3 h-3 rounded-full bg-amber-500"></span>
                             <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Solicitações</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -82,42 +82,41 @@ export default function DashboardPage() {
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.1)" />
-                            <XAxis 
-                                dataKey="name" 
-                                axisLine={false} 
-                                tickLine={false} 
-                                tick={{ fill: '#94a3b8', fontSize: 12 }} 
+                            <XAxis
+                                dataKey="name"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fill: '#94a3b8', fontSize: 12 }}
                                 dy={10}
                             />
-                            <YAxis 
-                                axisLine={false} 
-                                tickLine={false} 
+                            <YAxis
+                                axisLine={false}
+                                tickLine={false}
                                 tick={{ fill: '#94a3b8', fontSize: 12 }}
                             />
-                            <Tooltip 
-                                contentStyle={{ 
-                                    backgroundColor: '#1e293b', 
-                                    border: 'none', 
-                                    borderRadius: '8px', 
+                            <Tooltip
+                                contentStyle={{
+                                    backgroundColor: '#1e293b',
+                                    border: 'none',
+                                    borderRadius: '8px',
                                     color: '#fff',
                                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                                 }}
                                 itemStyle={{ color: '#fff' }}
                             />
-                            <Line 
-                                type="monotone" 
-                                dataKey="solicitacoes" 
-                                stroke="#1e293b" 
-                                strokeWidth={3} 
-                                dot={{ fill: '#1e293b', stroke: '#fff', strokeWidth: 2, r: 4 }}
+                            <Line
+                                type="monotone"
+                                dataKey="solicitacoes"
+                                stroke="#f59e0b"
+                                strokeWidth={3}
+                                dot={{ fill: '#f59e0b', stroke: '#fff', strokeWidth: 2, r: 4 }}
                                 activeDot={{ r: 6 }}
-                                className="dark:stroke-slate-400 dark:fill-slate-400"
                             />
-                            <Line 
-                                type="monotone" 
-                                dataKey="produtos" 
-                                stroke="#135bec" 
-                                strokeWidth={3} 
+                            <Line
+                                type="monotone"
+                                dataKey="produtos"
+                                stroke="#135bec"
+                                strokeWidth={3}
                                 dot={{ fill: '#135bec', stroke: '#fff', strokeWidth: 2, r: 4 }}
                                 activeDot={{ r: 6 }}
                             />
