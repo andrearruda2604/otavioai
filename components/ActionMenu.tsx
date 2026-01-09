@@ -1,0 +1,115 @@
+import React, { useState, useRef, useEffect } from 'react';
+
+interface ActionMenuProps {
+    onResetPassword?: () => void;
+    onDeactivate?: () => void;
+    onActivate?: () => void;
+    onDelete?: () => void;
+    onRestore?: () => void;
+    onApprove?: () => void;
+    isDeleted?: boolean;
+    isPending?: boolean;
+    isActive?: boolean;
+}
+
+export default function ActionMenu({
+    onResetPassword,
+    onDeactivate,
+    onActivate,
+    onDelete,
+    onRestore,
+    onApprove,
+    isDeleted,
+    isPending,
+    isActive
+}: ActionMenuProps) {
+    const [isOpen, setIsOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative" ref={menuRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            >
+                <span className="material-icons-round">more_horiz</span>
+            </button>
+
+            {isOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50">
+                    {isDeleted ? (
+                        <button
+                            onClick={() => { onRestore?.(); setIsOpen(false); }}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-emerald-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+                        >
+                            <span className="material-icons-round text-lg">restore</span>
+                            Restaurar Usuário
+                        </button>
+                    ) : (
+                        <>
+                            {isPending && onApprove && (
+                                <button
+                                    onClick={() => { onApprove(); setIsOpen(false); }}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-emerald-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                >
+                                    <span className="material-icons-round text-lg">check_circle</span>
+                                    Aprovar Acesso
+                                </button>
+                            )}
+
+                            {onResetPassword && (
+                                <button
+                                    onClick={() => { onResetPassword(); setIsOpen(false); }}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-primary hover:bg-slate-50 dark:hover:bg-slate-700"
+                                >
+                                    <span className="material-icons-round text-lg">key</span>
+                                    Redefinir Senha
+                                </button>
+                            )}
+
+                            {isActive && onDeactivate && (
+                                <button
+                                    onClick={() => { onDeactivate(); setIsOpen(false); }}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-amber-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                >
+                                    <span className="material-icons-round text-lg">block</span>
+                                    Desativar Acesso
+                                </button>
+                            )}
+
+                            {!isActive && !isPending && onActivate && (
+                                <button
+                                    onClick={() => { onActivate(); setIsOpen(false); }}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-emerald-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                >
+                                    <span className="material-icons-round text-lg">check_circle</span>
+                                    Ativar Acesso
+                                </button>
+                            )}
+
+                            {onDelete && (
+                                <button
+                                    onClick={() => { onDelete(); setIsOpen(false); }}
+                                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+                                >
+                                    <span className="material-icons-round text-lg">delete</span>
+                                    Excluir Usuário
+                                </button>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

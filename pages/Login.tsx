@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
@@ -16,11 +16,11 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            const success = await login(email, password);
-            if (success) {
+            const result = await login(email, password);
+            if (result.success) {
                 navigate('/dashboard');
             } else {
-                setError('Email ou senha inválidos, ou usuário inativo.');
+                setError(result.message);
             }
         } catch (err) {
             setError('Erro ao fazer login. Tente novamente.');
@@ -44,7 +44,7 @@ export default function LoginPage() {
                         <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                             <span className="material-icons-round text-white text-2xl">smart_toy</span>
                         </div>
-                        <h1 className="text-2xl font-bold text-white">Octavio AI</h1>
+                        <h1 className="text-2xl font-bold text-white">Otavio AI</h1>
                     </div>
                 </div>
 
@@ -70,7 +70,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="relative z-10 text-white/40 text-sm">
-                    © 2026 Octavio AI. Todos os direitos reservados.
+                    © 2026 Otavio AI. Todos os direitos reservados.
                 </div>
             </div>
 
@@ -82,7 +82,7 @@ export default function LoginPage() {
                         <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
                             <span className="material-icons-round text-white text-2xl">smart_toy</span>
                         </div>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Octavio AI</h1>
+                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Otavio AI</h1>
                     </div>
 
                     <div className="text-center lg:text-left">
@@ -175,9 +175,15 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="text-center">
-                        <p className="text-sm text-slate-500 dark:text-slate-500">
-                            Demo: <span className="text-slate-700 dark:text-slate-300">admin@octavio.ai</span> / <span className="text-slate-700 dark:text-slate-300">admin123</span>
+                    <div className="text-center space-y-3">
+                        <p className="text-slate-500 dark:text-slate-400">
+                            Não tem uma conta?{' '}
+                            <Link to="/signup" className="text-primary hover:text-primary/80 font-medium">
+                                Criar conta
+                            </Link>
+                        </p>
+                        <p className="text-sm text-slate-400 dark:text-slate-500">
+                            Demo: <span className="text-slate-600 dark:text-slate-400">admin@otavio.ai</span> / <span className="text-slate-600 dark:text-slate-400">admin123</span>
                         </p>
                     </div>
                 </div>

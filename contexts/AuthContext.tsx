@@ -1,25 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { User, Profile, AuthContextType, UserProfile } from '../types/authTypes';
+import { User, Profile, AuthContextType, UserProfile, UserStatus, MenuPermissions, defaultPermissions } from '../types/authTypes';
 
-// Dados mockados para fallback (quando Supabase não está configurado)
+// Dados mockados para fallback
 const mockUsers: User[] = [
-    { id: '1', name: 'Andre Arruda', email: 'admin@octavio.ai', profile: 'admin', status: 'Ativo', createdAt: '09/01/2026' },
-    { id: '2', name: 'Maria Cruz', email: 'maria@wgabrasil.com.br', profile: 'tecnico', status: 'Ativo', createdAt: '19/12/2025' },
-    { id: '3', name: 'Jose da Silva', email: 'josedasilva@wgabrasil.com', profile: 'tecnico', status: 'Inativo', createdAt: '19/12/2025' },
+    { id: '1', name: 'Admin', email: 'admin@otavio.ai', profile: 'admin', status: 'Ativo', createdAt: '09/01/2026' },
+    { id: '2', name: 'Maria Cruz', email: 'maria@empresa.com.br', profile: 'tecnico', status: 'Ativo', createdAt: '19/12/2025' },
+    { id: '3', name: 'Jose Silva', email: 'jose@empresa.com', profile: 'tecnico', status: 'Pendente', createdAt: '19/12/2025' },
 ];
 
 const mockPasswords: Record<string, string> = {
-    'admin@octavio.ai': 'admin123',
-    'maria@wgabrasil.com.br': 'tecnico123',
-    'josedasilva@wgabrasil.com': 'tecnico123',
+    'admin@otavio.ai': 'admin123',
+    'maria@empresa.com.br': 'tecnico123',
 };
 
 const mockProfiles: Profile[] = [
-    { id: '1', name: 'admin', description: 'Administrador do sistema - acesso total', isSystem: true, permissionsCount: 11 },
-    { id: '2', name: 'tecnico', description: 'Técnico de campo - acesso básico', isSystem: true, permissionsCount: 6 },
-    { id: '3', name: 'gerente', description: 'Gerente de equipe - acesso intermediário', isSystem: true, permissionsCount: 8 },
+    { id: '1', name: 'admin', description: 'Administrador do sistema - acesso total', isSystem: true, permissionsCount: 7, permissions: { dashboard: true, insights: true, pipeline: true, chat: true, leads: true, knowledge: true, users: true } },
+    { id: '2', name: 'tecnico', description: 'Técnico de campo - acesso básico', isSystem: true, permissionsCount: 4, permissions: { dashboard: true, insights: false, pipeline: false, chat: true, leads: true, knowledge: true, users: false } },
+    { id: '3', name: 'gerente', description: 'Gerente de equipe - acesso intermediário', isSystem: true, permissionsCount: 6, permissions: { dashboard: true, insights: true, pipeline: true, chat: true, leads: true, knowledge: true, users: false } },
 ];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,10 +26,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [user, setUser] = useState<User | null>(null);
     const [users, setUsers] = useState<User[]>([]);
     const [profiles, setProfiles] = useState<Profile[]>(mockProfiles);
+    const [showDeleted, setShowDeleted] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Buscar perfil do usuário no Supabase
-    const fetchUserProfile = async (supabaseUser: SupabaseUser): Promise<User | null> => {
+    const getUserPermissions = (): MenuPermissions | null => {
+        if (!user) return null;
+        const profile = profiles.find(p => p.name === user.profile);
+        return profile?.permissions || defaultPermissions;
+    };
+
+    // Buscar perfil do usuário
+    const fetchUserProfile = async (supabaseUser: any): Promise<User | null> => {
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -39,26 +44,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 .eq('id', supabaseUser.id)
                 .single();
 
-            if (error || !data) {
-                console.error('Error fetching profile:', error);
-                return null;
-            }
+            if (error || !data) return null;
 
             return {
                 id: data.id,
                 name: data.name,
                 email: supabaseUser.email || '',
                 profile: data.role as UserProfile,
-                status: data.status,
+                status: data.status as UserStatus,
                 createdAt: new Date(data.created_at).toLocaleDateString('pt-BR'),
+                deletedAt: data.deleted_at,
+                approvedBy: data.approved_by,
+                approvedAt: data.approved_at,
             };
         } catch (err) {
-            console.error('Error in fetchUserProfile:', err);
             return null;
         }
     };
 
-    // Buscar todos os usuários (para gestão)
+    // Buscar todos os usuários
     const fetchAllUsers = async () => {
         if (!isSupabaseConfigured()) {
             setUsers(mockUsers);
@@ -66,31 +70,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .order('created_at', { ascending: false });
+            let query = supabase.from('profiles').select('*');
+
+            if (!showDeleted) {
+                query = query.is('deleted_at', null);
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) {
-                console.error('Error fetching users:', error);
                 setUsers([]);
                 return;
             }
 
-            // Buscar emails dos usuários via função RPC ou view
-            // Por enquanto, usamos o nome como identificador
             const mappedUsers: User[] = data.map((profile: any) => ({
                 id: profile.id,
                 name: profile.name,
-                email: profile.name.toLowerCase().replace(/\s/g, '.') + '@email.com', // Placeholder
+                email: profile.email || `${profile.name.toLowerCase().replace(/\s/g, '.')}@email.com`,
                 profile: profile.role as UserProfile,
-                status: profile.status,
+                status: profile.status as UserStatus,
                 createdAt: new Date(profile.created_at).toLocaleDateString('pt-BR'),
+                deletedAt: profile.deleted_at,
+                approvedBy: profile.approved_by,
+                approvedAt: profile.approved_at,
             }));
 
             setUsers(mappedUsers);
         } catch (err) {
-            console.error('Error in fetchAllUsers:', err);
             setUsers([]);
         }
     };
@@ -103,53 +109,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            const { data, error } = await supabase
-                .from('access_profiles')
-                .select('*')
-                .order('name');
+            const { data, error } = await supabase.from('access_profiles').select('*').order('name');
 
-            if (error) {
-                console.error('Error fetching access profiles:', error);
-                return;
-            }
+            if (error) return;
 
             const mappedProfiles: Profile[] = data.map((p: any) => ({
                 id: p.id,
                 name: p.name,
-                description: p.description,
+                description: p.description || '',
                 isSystem: p.is_system,
-                permissionsCount: p.permissions_count,
+                permissionsCount: p.permissions ? Object.values(p.permissions).filter(Boolean).length : 0,
+                permissions: p.permissions || defaultPermissions,
             }));
 
             setProfiles(mappedProfiles);
         } catch (err) {
-            console.error('Error in fetchAccessProfiles:', err);
+            console.error('Error fetching profiles:', err);
         }
     };
 
-    // Inicialização e listener de auth
+    // Inicialização
     useEffect(() => {
         if (!isSupabaseConfigured()) {
-            // Modo mock
-            const savedUser = localStorage.getItem('octavio_user');
-            if (savedUser) {
-                setUser(JSON.parse(savedUser));
-            }
+            const savedUser = localStorage.getItem('otavio_user');
+            if (savedUser) setUser(JSON.parse(savedUser));
             setUsers(mockUsers);
             setProfiles(mockProfiles);
             setLoading(false);
             return;
         }
 
-        // Modo Supabase
         const initAuth = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-
             if (session?.user) {
                 const profile = await fetchUserProfile(session.user);
                 setUser(profile);
             }
-
             await fetchAllUsers();
             await fetchAccessProfiles();
             setLoading(false);
@@ -157,7 +152,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         initAuth();
 
-        // Listener para mudanças de auth
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
                 const profile = await fetchUserProfile(session.user);
@@ -168,51 +162,77 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         });
 
-        return () => {
-            subscription.unsubscribe();
-        };
+        return () => subscription.unsubscribe();
     }, []);
 
+    useEffect(() => {
+        fetchAllUsers();
+    }, [showDeleted]);
+
     // Login
-    const login = async (email: string, password: string): Promise<boolean> => {
+    const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
         if (!isSupabaseConfigured()) {
-            // Modo mock
             const foundUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
             if (foundUser && mockPasswords[foundUser.email] === password) {
-                if (foundUser.status === 'Inativo') return false;
+                if (foundUser.status === 'Pendente') return { success: false, message: 'Sua conta está aguardando aprovação.' };
+                if (foundUser.status === 'Inativo') return { success: false, message: 'Sua conta foi desativada.' };
                 setUser(foundUser);
-                localStorage.setItem('octavio_user', JSON.stringify(foundUser));
-                return true;
+                localStorage.setItem('otavio_user', JSON.stringify(foundUser));
+                return { success: true, message: '' };
             }
-            return false;
+            return { success: false, message: 'Email ou senha inválidos.' };
         }
 
-        // Modo Supabase
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (error) {
-                console.error('Login error:', error.message);
-                return false;
-            }
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) return { success: false, message: error.message };
 
             if (data.user) {
                 const profile = await fetchUserProfile(data.user);
+                if (profile?.status === 'Pendente') {
+                    await supabase.auth.signOut();
+                    return { success: false, message: 'Sua conta está aguardando aprovação de um administrador.' };
+                }
                 if (profile?.status === 'Inativo') {
                     await supabase.auth.signOut();
-                    return false;
+                    return { success: false, message: 'Sua conta foi desativada. Entre em contato com o administrador.' };
                 }
                 setUser(profile);
-                return true;
+                return { success: true, message: '' };
             }
-
-            return false;
+            return { success: false, message: 'Erro desconhecido.' };
         } catch (err) {
-            console.error('Login error:', err);
-            return false;
+            return { success: false, message: 'Erro ao fazer login.' };
+        }
+    };
+
+    // Signup
+    const signup = async (email: string, password: string, name: string): Promise<{ success: boolean; message: string }> => {
+        if (!isSupabaseConfigured()) {
+            const newUser: User = {
+                id: String(mockUsers.length + 1),
+                name,
+                email,
+                profile: 'tecnico',
+                status: 'Pendente',
+                createdAt: new Date().toLocaleDateString('pt-BR'),
+            };
+            mockUsers.push(newUser);
+            return { success: true, message: '' };
+        }
+
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: { data: { name, role: 'tecnico' } }
+            });
+
+            if (error) return { success: false, message: error.message };
+            await supabase.auth.signOut();
+            return { success: true, message: '' };
+        } catch (err) {
+            return { success: false, message: 'Erro ao criar conta.' };
         }
     };
 
@@ -220,48 +240,228 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const logout = async () => {
         if (!isSupabaseConfigured()) {
             setUser(null);
-            localStorage.removeItem('octavio_user');
+            localStorage.removeItem('otavio_user');
             return;
         }
-
         await supabase.auth.signOut();
         setUser(null);
     };
 
-    // Atualizar perfil do usuário
-    const updateUserProfile = async (userId: string, profile: UserProfile) => {
+    // Criar usuário (admin)
+    const createUser = async (email: string, password: string, name: string, role: UserProfile): Promise<boolean> => {
         if (!isSupabaseConfigured()) {
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, profile } : u));
-            return;
+            const newUser: User = {
+                id: String(mockUsers.length + 1),
+                name,
+                email,
+                profile: role,
+                status: 'Ativo',
+                createdAt: new Date().toLocaleDateString('pt-BR'),
+            };
+            mockUsers.push(newUser);
+            setUsers([...mockUsers]);
+            return true;
         }
 
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ role: profile })
-                .eq('id', userId);
+            const { data, error } = await supabase.auth.admin.createUser({
+                email,
+                password,
+                email_confirm: true,
+                user_metadata: { name, role }
+            });
 
             if (error) {
-                console.error('Error updating profile:', error);
-                return;
+                // Fallback: usar signup normal
+                const { error: signupError } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: { data: { name, role } }
+                });
+                if (signupError) return false;
             }
 
-            // Atualizar lista local
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, profile } : u));
+            await fetchAllUsers();
+            return true;
         } catch (err) {
-            console.error('Error in updateUserProfile:', err);
+            return false;
         }
     };
+
+    // Atualizar perfil do usuário
+    const updateUserProfile = async (userId: string, profile: UserProfile): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, profile } : u));
+            return true;
+        }
+
+        try {
+            const { error } = await supabase.from('profiles').update({ role: profile }).eq('id', userId);
+            if (error) return false;
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, profile } : u));
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    // Atualizar status do usuário
+    const updateUserStatus = async (userId: string, status: UserStatus): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+            return true;
+        }
+
+        try {
+            const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
+            if (error) return false;
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    // Soft delete usuário
+    const deleteUser = async (userId: string): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, deletedAt: new Date().toISOString() } : u));
+            return true;
+        }
+
+        try {
+            const { error } = await supabase.from('profiles').update({ deleted_at: new Date().toISOString() }).eq('id', userId);
+            if (error) return false;
+            await fetchAllUsers();
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    // Restaurar usuário
+    const restoreUser = async (userId: string): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, deletedAt: null } : u));
+            return true;
+        }
+
+        try {
+            const { error } = await supabase.from('profiles').update({ deleted_at: null }).eq('id', userId);
+            if (error) return false;
+            await fetchAllUsers();
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    // Aprovar usuário
+    const approveUser = async (userId: string): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'Ativo' as UserStatus, approvedBy: user?.id, approvedAt: new Date().toISOString() } : u));
+            return true;
+        }
+
+        try {
+            const { error } = await supabase.from('profiles').update({
+                status: 'Ativo',
+                approved_by: user?.id,
+                approved_at: new Date().toISOString()
+            }).eq('id', userId);
+            if (error) return false;
+            await fetchAllUsers();
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    // Criar perfil de acesso
+    const createProfile = async (name: string, description: string, permissions: MenuPermissions): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            const newProfile: Profile = {
+                id: String(profiles.length + 1),
+                name,
+                description,
+                isSystem: false,
+                permissionsCount: Object.values(permissions).filter(Boolean).length,
+                permissions,
+            };
+            setProfiles(prev => [...prev, newProfile]);
+            return true;
+        }
+
+        try {
+            const { error } = await supabase.from('access_profiles').insert({
+                name,
+                description,
+                is_system: false,
+                permissions,
+                permissions_count: Object.values(permissions).filter(Boolean).length
+            });
+            if (error) return false;
+            await fetchAccessProfiles();
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    // Atualizar perfil de acesso
+    const updateProfile = async (id: string, name: string, description: string, permissions: MenuPermissions): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setProfiles(prev => prev.map(p => p.id === id ? {
+                ...p,
+                name,
+                description,
+                permissions,
+                permissionsCount: Object.values(permissions).filter(Boolean).length
+            } : p));
+            return true;
+        }
+
+        try {
+            const { error } = await supabase.from('access_profiles').update({
+                name,
+                description,
+                permissions,
+                permissions_count: Object.values(permissions).filter(Boolean).length
+            }).eq('id', id);
+            if (error) return false;
+            await fetchAccessProfiles();
+            return true;
+        } catch (err) {
+            return false;
+        }
+    };
+
+    const refreshUsers = async () => { await fetchAllUsers(); };
+    const refreshProfiles = async () => { await fetchAccessProfiles(); };
 
     const value: AuthContextType = {
         user,
         isAuthenticated: !!user,
         isAdmin: user?.profile === 'admin',
+        isManager: user?.profile === 'admin' || user?.profile === 'gerente',
+        permissions: getUserPermissions(),
         login,
+        signup,
         logout,
         users,
         profiles,
+        showDeleted,
+        setShowDeleted,
+        createUser,
         updateUserProfile,
+        updateUserStatus,
+        deleteUser,
+        restoreUser,
+        approveUser,
+        createProfile,
+        updateProfile,
+        refreshUsers,
+        refreshProfiles,
     };
 
     if (loading) {
@@ -275,17 +475,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
     }
 
-    return (
-        <AuthContext.Provider value={value}>
-            {children}
-        </AuthContext.Provider>
-    );
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-    }
+    if (!context) throw new Error('useAuth deve ser usado dentro de um AuthProvider');
     return context;
 };

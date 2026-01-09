@@ -12,7 +12,7 @@ UPDATE public.profiles
 SET role = 'admin', name = 'Administrador'
 WHERE id = (
     SELECT id FROM auth.users 
-    WHERE email = 'admin@octavio.ai'  -- Altere para o email do admin
+    WHERE email = 'admin@otavio.ai'  -- Altere para o email do admin
     LIMIT 1
 );
 
