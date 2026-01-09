@@ -140,15 +140,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         const initAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                const profile = await fetchUserProfile(session.user);
-                setUser(profile);
+            try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+                if (sessionError) {
+                    console.error('Session error:', sessionError);
+                    // Fallback to mock on error
+                    setUsers(mockUsers);
+                    setProfiles(mockProfiles);
+                    setLoading(false);
+                    return;
+                }
+
+                if (session?.user) {
+                    const profile = await fetchUserProfile(session.user);
+                    setUser(profile);
+                }
+
+                // Try to fetch from Supabase, fallback to mock on error
+                try {
+                    await fetchAllUsers();
+                    await fetchAccessProfiles();
+                } catch (fetchError) {
+                    console.error('Fetch error, using mock data:', fetchError);
+                    setUsers(mockUsers);
+                    setProfiles(mockProfiles);
+                }
+            } catch (err) {
+                console.error('Init auth error:', err);
+                setUsers(mockUsers);
+                setProfiles(mockProfiles);
+            } finally {
+                setLoading(false);
             }
-            await fetchAllUsers();
-            await fetchAccessProfiles();
-            setLoading(false);
         };
+
+        // Add timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+            if (loading) {
+                console.warn('Auth init timeout, using mock data');
+                setUsers(mockUsers);
+                setProfiles(mockProfiles);
+                setLoading(false);
+            }
+        }, 5000);
 
         initAuth();
 
@@ -162,7 +197,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            clearTimeout(timeoutId);
+            subscription.unsubscribe();
+        };
     }, []);
 
     useEffect(() => {
