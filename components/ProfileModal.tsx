@@ -98,7 +98,6 @@ export default function ProfileModal({ isOpen, onClose, onSave, editData }: Prof
                                 className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-slate-900 dark:text-white"
                                 placeholder="Ex: supervisor"
                                 required
-                                disabled={editData?.name === 'admin' || editData?.name === 'tecnico' || editData?.name === 'gerente'}
                             />
                         </div>
 
