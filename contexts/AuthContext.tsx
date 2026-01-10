@@ -208,16 +208,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         setUser(profile);
                         const permissions = await fetchUserPermissions(profile.role_id);
                         setUserPermissions(permissions);
-                    }
-                }
 
-                try {
-                    await fetchAllUsers();
-                    await fetchRoles();
-                } catch (fetchError) {
-                    console.error('Fetch error, using mock data:', fetchError);
-                    setUsers(mockUsers);
-                    setRoles(mockRoles);
+                        // Fetch data only if authenticated
+                        try {
+                            console.log('Auth: Fetching users and roles...');
+                            await Promise.all([fetchAllUsers(), fetchRoles()]);
+                            console.log('Auth: Data fetch complete');
+                        } catch (fetchError) {
+                            console.error('Fetch error:', fetchError);
+                        }
+                    }
+                } else {
+                    console.log('Auth: No user session, skipping data fetch');
                 }
             } catch (err) {
                 console.error('Init auth error:', err);
@@ -241,16 +243,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
+                console.log('Auth: Signed in, fetching data...');
                 const profile = await fetchUserProfile(session.user);
                 if (profile) {
                     setUser(profile);
                     const permissions = await fetchUserPermissions(profile.role_id);
                     setUserPermissions(permissions);
                 }
-                await fetchAllUsers();
+                await Promise.all([fetchAllUsers(), fetchRoles()]);
             } else if (event === 'SIGNED_OUT') {
+                console.log('Auth: Signed out, clearing state');
                 setUser(null);
                 setUserPermissions([]);
+                setUsers([]);
             }
         });
 
