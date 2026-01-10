@@ -187,11 +187,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         const initAuth = async () => {
-            console.log('Auth: Starting initialization...');
             try {
-                console.log('Auth: Checking session...');
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-                console.log('Auth: Session check complete', { session: !!session, error: sessionError });
 
                 if (sessionError) {
                     console.error('Session error:', sessionError);
@@ -202,12 +199,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
 
                 if (session?.user) {
-                    console.log('Auth: User found, fetching profile...');
                     const profile = await fetchUserProfile(session.user);
                     if (profile) {
                         // Check if user is pending
                         if (profile.status === 'Pendente') {
-                            console.log('Auth: User is pending, signing out...');
                             await supabase.auth.signOut();
                             setUsers(mockUsers);
                             setRoles(mockRoles);
@@ -221,15 +216,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
                         // Fetch data only if authenticated and not pending
                         try {
-                            console.log('Auth: Fetching users and roles...');
                             await Promise.all([fetchAllUsers(), fetchRoles()]);
-                            console.log('Auth: Data fetch complete');
                         } catch (fetchError) {
                             console.error('Fetch error:', fetchError);
                         }
                     }
-                } else {
-                    console.log('Auth: No user session, skipping data fetch');
                 }
             } catch (err) {
                 console.error('Init auth error:', err);
@@ -253,12 +244,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
-                console.log('Auth: Signed in, fetching data...');
                 const profile = await fetchUserProfile(session.user);
                 if (profile) {
                     // Check if user is pending
                     if (profile.status === 'Pendente') {
-                        console.log('Auth: User is pending (onAuthStateChange), signing out...');
                         await supabase.auth.signOut();
                         return;
                     }
@@ -269,7 +258,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     await Promise.all([fetchAllUsers(), fetchRoles()]);
                 }
             } else if (event === 'SIGNED_OUT') {
-                console.log('Auth: Signed out, clearing state');
                 setUser(null);
                 setUserPermissions([]);
                 setUsers([]);
