@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { User, Profile, AuthContextType, UserProfile, UserStatus, MenuPermissions, defaultPermissions } from '../types/authTypes';
+import { User, Role, AuthContextType, UserStatus, defaultPermissions } from '../types/authTypes';
 
 // Dados mockados para fallback
 const mockUsers: User[] = [
-    { id: '1', name: 'Admin', email: 'admin@otavio.ai', profile: 'admin', status: 'Ativo', createdAt: '09/01/2026' },
-    { id: '2', name: 'Maria Cruz', email: 'maria@empresa.com.br', profile: 'tecnico', status: 'Ativo', createdAt: '19/12/2025' },
-    { id: '3', name: 'Jose Silva', email: 'jose@empresa.com', profile: 'tecnico', status: 'Pendente', createdAt: '19/12/2025' },
+    { id: '1', name: 'Admin', email: 'admin@otavio.ai', role_id: '1', roleName: 'admin', status: 'Ativo', createdAt: '09/01/2026' },
+    { id: '2', name: 'Maria Cruz', email: 'maria@empresa.com.br', role_id: '3', roleName: 'tecnico', status: 'Ativo', createdAt: '19/12/2025' },
+    { id: '3', name: 'Jose Silva', email: 'jose@empresa.com', role_id: '3', roleName: 'tecnico', status: 'Pendente', createdAt: '19/12/2025' },
 ];
 
 const mockPasswords: Record<string, string> = {
@@ -14,50 +14,82 @@ const mockPasswords: Record<string, string> = {
     'maria@empresa.com.br': 'tecnico123',
 };
 
-const mockProfiles: Profile[] = [
-    { id: '1', name: 'admin', description: 'Administrador do sistema - acesso total', isSystem: true, permissionsCount: 7, permissions: { dashboard: true, insights: true, pipeline: true, chat: true, leads: true, knowledge: true, users: true } },
-    { id: '2', name: 'tecnico', description: 'Técnico de campo - acesso básico', isSystem: true, permissionsCount: 4, permissions: { dashboard: true, insights: false, pipeline: false, chat: true, leads: true, knowledge: true, users: false } },
-    { id: '3', name: 'gerente', description: 'Gerente de equipe - acesso intermediário', isSystem: true, permissionsCount: 6, permissions: { dashboard: true, insights: true, pipeline: true, chat: true, leads: true, knowledge: true, users: false } },
+const mockRoles: Role[] = [
+    { id: '1', name: 'admin', description: 'Administrador do sistema - acesso total', isSystem: true },
+    { id: '2', name: 'gerente', description: 'Gerente de equipe - acesso intermediário', isSystem: true },
+    { id: '3', name: 'tecnico', description: 'Técnico de campo - acesso básico', isSystem: true },
 ];
+
+const mockPermissions: Record<string, string[]> = {
+    'admin': ['dashboard', 'insights', 'pipeline', 'chat', 'leads', 'knowledge', 'users'],
+    'gerente': ['dashboard', 'insights', 'pipeline', 'chat', 'leads', 'knowledge'],
+    'tecnico': ['dashboard', 'chat', 'leads', 'knowledge'],
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [users, setUsers] = useState<User[]>([]);
-    const [profiles, setProfiles] = useState<Profile[]>(mockProfiles);
+    const [roles, setRoles] = useState<Role[]>(mockRoles);
+    const [userPermissions, setUserPermissions] = useState<string[]>([]);
     const [showDeleted, setShowDeleted] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    const getUserPermissions = (): MenuPermissions | null => {
-        if (!user) return null;
-        const profile = profiles.find(p => p.name === user.profile);
-        return profile?.permissions || defaultPermissions;
+    // Buscar permissões do usuário baseado no role_id
+    const fetchUserPermissions = async (roleId: string | null): Promise<string[]> => {
+        if (!roleId) return defaultPermissions;
+
+        if (!isSupabaseConfigured()) {
+            // Mock: encontrar role e retornar permissões
+            const role = mockRoles.find(r => r.id === roleId);
+            return role ? (mockPermissions[role.name] || defaultPermissions) : defaultPermissions;
+        }
+
+        try {
+            const { data, error } = await supabase
+                .from('role_permissions')
+                .select('route_key')
+                .eq('role_id', roleId);
+
+            if (error || !data) return defaultPermissions;
+            return data.map(p => p.route_key);
+        } catch {
+            return defaultPermissions;
+        }
     };
 
     // Buscar perfil do usuário
     const fetchUserProfile = async (supabaseUser: any): Promise<User | null> => {
         try {
-            const { data, error } = await supabase
+            const { data: profile, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select(`
+                    *,
+                    roles:role_id (
+                        id,
+                        name,
+                        description
+                    )
+                `)
                 .eq('id', supabaseUser.id)
                 .single();
 
-            if (error || !data) return null;
+            if (error || !profile) return null;
 
             return {
-                id: data.id,
-                name: data.name,
-                email: supabaseUser.email || '',
-                profile: data.role as UserProfile,
-                status: data.status as UserStatus,
-                createdAt: new Date(data.created_at).toLocaleDateString('pt-BR'),
-                deletedAt: data.deleted_at,
-                approvedBy: data.approved_by,
-                approvedAt: data.approved_at,
+                id: profile.id,
+                name: profile.name,
+                email: profile.email || supabaseUser.email || '',
+                role_id: profile.role_id,
+                roleName: profile.roles?.name || 'tecnico',
+                status: profile.status as UserStatus,
+                createdAt: new Date(profile.created_at).toLocaleDateString('pt-BR'),
+                deletedAt: profile.deleted_at,
+                approvedBy: profile.approved_by,
+                approvedAt: profile.approved_at,
             };
-        } catch (err) {
+        } catch {
             return null;
         }
     };
@@ -70,7 +102,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            let query = supabase.from('profiles').select('*');
+            let query = supabase.from('profiles').select(`
+                *,
+                roles:role_id (
+                    id,
+                    name,
+                    description
+                )
+            `);
 
             if (!showDeleted) {
                 query = query.is('deleted_at', null);
@@ -87,7 +126,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 id: profile.id,
                 name: profile.name,
                 email: profile.email || `${profile.name.toLowerCase().replace(/\s/g, '.')}@email.com`,
-                profile: profile.role as UserProfile,
+                role_id: profile.role_id,
+                roleName: profile.roles?.name || 'tecnico',
                 status: profile.status as UserStatus,
                 createdAt: new Date(profile.created_at).toLocaleDateString('pt-BR'),
                 deletedAt: profile.deleted_at,
@@ -96,35 +136,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }));
 
             setUsers(mappedUsers);
-        } catch (err) {
+        } catch {
             setUsers([]);
         }
     };
 
-    // Buscar perfis de acesso
-    const fetchAccessProfiles = async () => {
+    // Buscar roles
+    const fetchRoles = async () => {
         if (!isSupabaseConfigured()) {
-            setProfiles(mockProfiles);
+            setRoles(mockRoles);
             return;
         }
 
         try {
-            const { data, error } = await supabase.from('access_profiles').select('*').order('name');
+            const { data, error } = await supabase
+                .from('roles')
+                .select('*')
+                .order('name');
 
             if (error) return;
 
-            const mappedProfiles: Profile[] = data.map((p: any) => ({
-                id: p.id,
-                name: p.name,
-                description: p.description || '',
-                isSystem: p.is_system,
-                permissionsCount: p.permissions ? Object.values(p.permissions).filter(Boolean).length : 0,
-                permissions: p.permissions || defaultPermissions,
+            const mappedRoles: Role[] = data.map((r: any) => ({
+                id: r.id,
+                name: r.name,
+                description: r.description || '',
+                isSystem: r.is_system,
+                createdAt: r.created_at,
             }));
 
-            setProfiles(mappedProfiles);
-        } catch (err) {
-            console.error('Error fetching profiles:', err);
+            setRoles(mappedRoles);
+        } catch {
+            console.error('Error fetching roles');
         }
     };
 
@@ -132,9 +174,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         if (!isSupabaseConfigured()) {
             const savedUser = localStorage.getItem('otavio_user');
-            if (savedUser) setUser(JSON.parse(savedUser));
+            if (savedUser) {
+                const parsedUser = JSON.parse(savedUser);
+                setUser(parsedUser);
+                const role = mockRoles.find(r => r.id === parsedUser.role_id);
+                setUserPermissions(role ? (mockPermissions[role.name] || defaultPermissions) : defaultPermissions);
+            }
             setUsers(mockUsers);
-            setProfiles(mockProfiles);
+            setRoles(mockRoles);
             setLoading(false);
             return;
         }
@@ -145,42 +192,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
                 if (sessionError) {
                     console.error('Session error:', sessionError);
-                    // Fallback to mock on error
                     setUsers(mockUsers);
-                    setProfiles(mockProfiles);
+                    setRoles(mockRoles);
                     setLoading(false);
                     return;
                 }
 
                 if (session?.user) {
                     const profile = await fetchUserProfile(session.user);
-                    setUser(profile);
+                    if (profile) {
+                        setUser(profile);
+                        const permissions = await fetchUserPermissions(profile.role_id);
+                        setUserPermissions(permissions);
+                    }
                 }
 
-                // Try to fetch from Supabase, fallback to mock on error
                 try {
                     await fetchAllUsers();
-                    await fetchAccessProfiles();
+                    await fetchRoles();
                 } catch (fetchError) {
                     console.error('Fetch error, using mock data:', fetchError);
                     setUsers(mockUsers);
-                    setProfiles(mockProfiles);
+                    setRoles(mockRoles);
                 }
             } catch (err) {
                 console.error('Init auth error:', err);
                 setUsers(mockUsers);
-                setProfiles(mockProfiles);
+                setRoles(mockRoles);
             } finally {
                 setLoading(false);
             }
         };
 
-        // Add timeout to prevent infinite loading
         const timeoutId = setTimeout(() => {
             if (loading) {
                 console.warn('Auth init timeout, using mock data');
                 setUsers(mockUsers);
-                setProfiles(mockProfiles);
+                setRoles(mockRoles);
                 setLoading(false);
             }
         }, 5000);
@@ -190,10 +238,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
                 const profile = await fetchUserProfile(session.user);
-                setUser(profile);
+                if (profile) {
+                    setUser(profile);
+                    const permissions = await fetchUserPermissions(profile.role_id);
+                    setUserPermissions(permissions);
+                }
                 await fetchAllUsers();
             } else if (event === 'SIGNED_OUT') {
                 setUser(null);
+                setUserPermissions([]);
             }
         });
 
@@ -215,6 +268,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (foundUser.status === 'Pendente') return { success: false, message: 'Sua conta está aguardando aprovação.' };
                 if (foundUser.status === 'Inativo') return { success: false, message: 'Sua conta foi desativada.' };
                 setUser(foundUser);
+                const role = mockRoles.find(r => r.id === foundUser.role_id);
+                setUserPermissions(role ? (mockPermissions[role.name] || defaultPermissions) : defaultPermissions);
                 localStorage.setItem('otavio_user', JSON.stringify(foundUser));
                 return { success: true, message: '' };
             }
@@ -235,11 +290,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     await supabase.auth.signOut();
                     return { success: false, message: 'Sua conta foi desativada. Entre em contato com o administrador.' };
                 }
-                setUser(profile);
+                if (profile) {
+                    setUser(profile);
+                    const permissions = await fetchUserPermissions(profile.role_id);
+                    setUserPermissions(permissions);
+                }
                 return { success: true, message: '' };
             }
             return { success: false, message: 'Erro desconhecido.' };
-        } catch (err) {
+        } catch {
             return { success: false, message: 'Erro ao fazer login.' };
         }
     };
@@ -247,11 +306,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Signup
     const signup = async (email: string, password: string, name: string): Promise<{ success: boolean; message: string }> => {
         if (!isSupabaseConfigured()) {
+            const tecnicoRole = mockRoles.find(r => r.name === 'tecnico');
             const newUser: User = {
                 id: String(mockUsers.length + 1),
                 name,
                 email,
-                profile: 'tecnico',
+                role_id: tecnicoRole?.id || '3',
+                roleName: 'tecnico',
                 status: 'Pendente',
                 createdAt: new Date().toLocaleDateString('pt-BR'),
             };
@@ -260,7 +321,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            const { data, error } = await supabase.auth.signUp({
+            const { error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: { data: { name, role: 'tecnico' } }
@@ -269,7 +330,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) return { success: false, message: error.message };
             await supabase.auth.signOut();
             return { success: true, message: '' };
-        } catch (err) {
+        } catch {
             return { success: false, message: 'Erro ao criar conta.' };
         }
     };
@@ -278,21 +339,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const logout = async () => {
         if (!isSupabaseConfigured()) {
             setUser(null);
+            setUserPermissions([]);
             localStorage.removeItem('otavio_user');
             return;
         }
         await supabase.auth.signOut();
         setUser(null);
+        setUserPermissions([]);
     };
 
     // Criar usuário (admin)
-    const createUser = async (email: string, password: string, name: string, role: UserProfile): Promise<boolean> => {
+    const createUser = async (email: string, password: string, name: string, roleId: string): Promise<boolean> => {
         if (!isSupabaseConfigured()) {
+            const role = mockRoles.find(r => r.id === roleId);
             const newUser: User = {
                 id: String(mockUsers.length + 1),
                 name,
                 email,
-                profile: role,
+                role_id: roleId,
+                roleName: role?.name || 'tecnico',
                 status: 'Ativo',
                 createdAt: new Date().toLocaleDateString('pt-BR'),
             };
@@ -302,43 +367,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            const { data, error } = await supabase.auth.admin.createUser({
+            // Get role name for metadata
+            const role = roles.find(r => r.id === roleId);
+
+            const { error } = await supabase.auth.signUp({
                 email,
                 password,
-                email_confirm: true,
-                user_metadata: { name, role }
+                options: { data: { name, role: role?.name || 'tecnico' } }
             });
 
-            if (error) {
-                // Fallback: usar signup normal
-                const { error: signupError } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: { data: { name, role } }
-                });
-                if (signupError) return false;
-            }
+            if (error) return false;
+
+            // Update the profile with correct role_id
+            // (trigger creates with tecnico by default)
+            // We need to wait a bit for the trigger to execute
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             await fetchAllUsers();
             return true;
-        } catch (err) {
+        } catch {
             return false;
         }
     };
 
-    // Atualizar perfil do usuário
-    const updateUserProfile = async (userId: string, profile: UserProfile): Promise<boolean> => {
+    // Atualizar role do usuário
+    const updateUserRole = async (userId: string, roleId: string): Promise<boolean> => {
         if (!isSupabaseConfigured()) {
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, profile } : u));
+            const role = mockRoles.find(r => r.id === roleId);
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role_id: roleId, roleName: role?.name || 'tecnico' } : u));
             return true;
         }
 
         try {
-            const { error } = await supabase.from('profiles').update({ role: profile }).eq('id', userId);
+            const { error } = await supabase.from('profiles').update({ role_id: roleId }).eq('id', userId);
             if (error) return false;
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, profile } : u));
+
+            const role = roles.find(r => r.id === roleId);
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role_id: roleId, roleName: role?.name || 'tecnico' } : u));
             return true;
-        } catch (err) {
+        } catch {
             return false;
         }
     };
@@ -355,7 +422,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) return false;
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
             return true;
-        } catch (err) {
+        } catch {
             return false;
         }
     };
@@ -372,7 +439,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) return false;
             await fetchAllUsers();
             return true;
-        } catch (err) {
+        } catch {
             return false;
         }
     };
@@ -389,7 +456,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) return false;
             await fetchAllUsers();
             return true;
-        } catch (err) {
+        } catch {
             return false;
         }
     };
@@ -410,96 +477,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) return false;
             await fetchAllUsers();
             return true;
-        } catch (err) {
-            return false;
-        }
-    };
-
-    // Criar perfil de acesso
-    const createProfile = async (name: string, description: string, permissions: MenuPermissions): Promise<boolean> => {
-        if (!isSupabaseConfigured()) {
-            const newProfile: Profile = {
-                id: String(profiles.length + 1),
-                name,
-                description,
-                isSystem: false,
-                permissionsCount: Object.values(permissions).filter(Boolean).length,
-                permissions,
-            };
-            setProfiles(prev => [...prev, newProfile]);
-            return true;
-        }
-
-        try {
-            const { error } = await supabase.from('access_profiles').insert({
-                name,
-                description,
-                is_system: false,
-                permissions,
-                permissions_count: Object.values(permissions).filter(Boolean).length
-            });
-            if (error) return false;
-            await fetchAccessProfiles();
-            return true;
-        } catch (err) {
-            return false;
-        }
-    };
-
-    // Atualizar perfil de acesso
-    const updateProfile = async (id: string, name: string, description: string, permissions: MenuPermissions): Promise<boolean> => {
-        if (!isSupabaseConfigured()) {
-            setProfiles(prev => prev.map(p => p.id === id ? {
-                ...p,
-                name,
-                description,
-                permissions,
-                permissionsCount: Object.values(permissions).filter(Boolean).length
-            } : p));
-            return true;
-        }
-
-        try {
-            const { error } = await supabase.from('access_profiles').update({
-                name,
-                description,
-                permissions,
-                permissions_count: Object.values(permissions).filter(Boolean).length
-            }).eq('id', id);
-            if (error) return false;
-            await fetchAccessProfiles();
-            return true;
-        } catch (err) {
+        } catch {
             return false;
         }
     };
 
     const refreshUsers = async () => { await fetchAllUsers(); };
-    const refreshProfiles = async () => { await fetchAccessProfiles(); };
+    const refreshRoles = async () => { await fetchRoles(); };
 
     const value: AuthContextType = {
         user,
         isAuthenticated: !!user,
-        isAdmin: user?.profile === 'admin',
-        isManager: user?.profile === 'admin' || user?.profile === 'gerente',
-        permissions: getUserPermissions(),
+        isAdmin: user?.roleName === 'admin',
+        isManager: user?.roleName === 'admin' || user?.roleName === 'gerente',
+        userPermissions,
         login,
         signup,
         logout,
         users,
-        profiles,
+        roles,
         showDeleted,
         setShowDeleted,
         createUser,
-        updateUserProfile,
+        updateUserRole,
         updateUserStatus,
         deleteUser,
         restoreUser,
         approveUser,
-        createProfile,
-        updateProfile,
         refreshUsers,
-        refreshProfiles,
+        refreshRoles,
     };
 
     if (loading) {

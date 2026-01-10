@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
-import { UserProfile } from '../types/authTypes';
+import { Role } from '../types/authTypes';
 
 interface UserModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (email: string, password: string, name: string, role: UserProfile) => Promise<boolean>;
-    profiles: { name: string }[];
+    onSave: (email: string, password: string, name: string, roleId: string) => Promise<boolean>;
+    roles: Role[];
 }
 
-export default function UserModal({ isOpen, onClose, onSave, profiles }: UserModalProps) {
+export default function UserModal({ isOpen, onClose, onSave, roles }: UserModalProps) {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<UserProfile>('tecnico');
+    const [roleId, setRoleId] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Define o role padrão quando os roles são carregados
+    React.useEffect(() => {
+        if (roles.length > 0 && !roleId) {
+            const tecnicoRole = roles.find(r => r.name === 'tecnico');
+            setRoleId(tecnicoRole?.id || roles[0].id);
+        }
+    }, [roles, roleId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,12 +30,13 @@ export default function UserModal({ isOpen, onClose, onSave, profiles }: UserMod
         setLoading(true);
 
         try {
-            const success = await onSave(email, password, name, role);
+            const success = await onSave(email, password, name, roleId);
             if (success) {
                 setName('');
                 setEmail('');
                 setPassword('');
-                setRole('tecnico');
+                const tecnicoRole = roles.find(r => r.name === 'tecnico');
+                setRoleId(tecnicoRole?.id || roles[0]?.id || '');
                 onClose();
             } else {
                 setError('Erro ao criar usuário. Verifique os dados.');
@@ -109,12 +118,12 @@ export default function UserModal({ isOpen, onClose, onSave, profiles }: UserMod
                             Perfil
                         </label>
                         <select
-                            value={role}
-                            onChange={(e) => setRole(e.target.value as UserProfile)}
+                            value={roleId}
+                            onChange={(e) => setRoleId(e.target.value)}
                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-slate-900 dark:text-white"
                         >
-                            {profiles.map((p) => (
-                                <option key={p.name} value={p.name}>{p.name}</option>
+                            {roles.map((r) => (
+                                <option key={r.id} value={r.id}>{r.name}</option>
                             ))}
                         </select>
                     </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { HashRouter, Routes, Route, useLocation, Link, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { hasPermission } from './lib/permissions';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import DashboardPage from './pages/Dashboard';
@@ -41,7 +42,7 @@ const MobileHeader = ({ onMenuClick }: { onMenuClick: () => void }) => {
 
 const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
     const location = useLocation();
-    const { user, logout, permissions } = useAuth();
+    const { user, logout, userPermissions } = useAuth();
     const isActive = (path: string) => location.pathname === path;
     const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
 
@@ -56,28 +57,23 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
         }
     };
 
-    // Menu dinâmico baseado em permissões
+    // Todos os itens de navegação com suas respectivas chaves de permissão
     const allNavItems = [
-        { path: '/dashboard', icon: 'dashboard', label: 'Dashboard', key: 'dashboard' },
-        { path: '/insights', icon: 'insights', label: 'Insights', key: 'insights' },
-        { path: '/pipeline', icon: 'account_tree', label: 'Pipeline', key: 'pipeline' },
-        { path: '/chat', icon: 'chat', label: 'Chat', key: 'chat' },
-        { path: '/leads', icon: 'people', label: 'Leads', key: 'leads' },
-        { path: '/knowledge', icon: 'menu_book', label: 'Base de Conhecimento', key: 'knowledge' },
+        { path: '/dashboard', icon: 'dashboard', label: 'Dashboard', permKey: 'dashboard' },
+        { path: '/insights', icon: 'insights', label: 'Insights', permKey: 'insights' },
+        { path: '/pipeline', icon: 'account_tree', label: 'Pipeline', permKey: 'pipeline' },
+        { path: '/chat', icon: 'chat', label: 'Chat', permKey: 'chat' },
+        { path: '/leads', icon: 'people', label: 'Leads', permKey: 'leads' },
+        { path: '/knowledge', icon: 'menu_book', label: 'Base de Conhecimento', permKey: 'knowledge' },
     ];
 
     const adminItems = [
-        { path: '/users', icon: 'manage_accounts', label: 'Gestão de Usuários', key: 'users' },
+        { path: '/users', icon: 'manage_accounts', label: 'Gestão de Usuários', permKey: 'users' },
     ];
 
-    // Filtrar itens baseado em permissões
-    const navItems = allNavItems.filter(item =>
-        permissions?.[item.key as keyof typeof permissions] !== false
-    );
-
-    const visibleAdminItems = adminItems.filter(item =>
-        permissions?.[item.key as keyof typeof permissions] === true
-    );
+    // Filtrar itens baseado em permissões do role_permissions
+    const navItems = allNavItems.filter(item => hasPermission(userPermissions, item.permKey));
+    const visibleAdminItems = adminItems.filter(item => hasPermission(userPermissions, item.permKey));
 
     const handleNavClick = () => {
         if (window.innerWidth < 1024) {
@@ -171,7 +167,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
                         </div>
                         <div className="flex flex-col flex-1 min-w-0">
                             <span className="text-sm font-semibold text-white truncate">{user?.name || 'Usuário'}</span>
-                            <span className="text-xs text-slate-500 capitalize">{user?.profile || 'Carregando...'}</span>
+                            <span className="text-xs text-slate-500 capitalize">{user?.roleName || 'Carregando...'}</span>
                         </div>
                         <button
                             onClick={logout}
@@ -182,7 +178,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
                         </button>
                     </div>
                     <div className="mt-4 flex items-center justify-between text-[10px] text-slate-600 uppercase tracking-widest px-1">
-                        <span>Versão 1.3.0</span>
+                        <span>Versão 1.4.0</span>
                     </div>
                 </div>
             </aside>
@@ -191,7 +187,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
 };
 
 function AppContent() {
-    const { isAuthenticated, permissions } = useAuth();
+    const { isAuthenticated, userPermissions } = useAuth();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -223,22 +219,22 @@ function AppContent() {
                 <Routes>
                     <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                     <Route path="/insights" element={
-                        permissions?.insights ? <ProtectedRoute><InsightsPage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
+                        hasPermission(userPermissions, 'insights') ? <ProtectedRoute><InsightsPage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
                     } />
                     <Route path="/pipeline" element={
-                        permissions?.pipeline ? <ProtectedRoute><PipelinePage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
+                        hasPermission(userPermissions, 'pipeline') ? <ProtectedRoute><PipelinePage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
                     } />
                     <Route path="/chat" element={
-                        permissions?.chat ? <ProtectedRoute><ChatPage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
+                        hasPermission(userPermissions, 'chat') ? <ProtectedRoute><ChatPage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
                     } />
                     <Route path="/leads" element={
-                        permissions?.leads ? <ProtectedRoute><LeadsPage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
+                        hasPermission(userPermissions, 'leads') ? <ProtectedRoute><LeadsPage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
                     } />
                     <Route path="/knowledge" element={
-                        permissions?.knowledge ? <ProtectedRoute><KnowledgePage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
+                        hasPermission(userPermissions, 'knowledge') ? <ProtectedRoute><KnowledgePage /></ProtectedRoute> : <Navigate to="/dashboard" replace />
                     } />
                     <Route path="/users" element={
-                        permissions?.users ? <AdminRoute><UserManagementPage /></AdminRoute> : <Navigate to="/dashboard" replace />
+                        hasPermission(userPermissions, 'users') ? <AdminRoute><UserManagementPage /></AdminRoute> : <Navigate to="/dashboard" replace />
                     } />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
