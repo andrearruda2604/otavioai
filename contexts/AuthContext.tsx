@@ -187,8 +187,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         const initAuth = async () => {
+            console.log('Auth: Starting initialization...');
             try {
+                console.log('Auth: Checking session...');
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                console.log('Auth: Session check complete', { session: !!session, error: sessionError });
 
                 if (sessionError) {
                     console.error('Session error:', sessionError);
@@ -199,6 +202,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 }
 
                 if (session?.user) {
+                    console.log('Auth: User found, fetching profile...');
                     const profile = await fetchUserProfile(session.user);
                     if (profile) {
                         setUser(profile);
@@ -231,7 +235,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setRoles(mockRoles);
                 setLoading(false);
             }
-        }, 5000);
+        }, 10000);
 
         initAuth();
 
