@@ -383,11 +383,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUser(null);
             setUserPermissions([]);
             localStorage.removeItem('otavio_user');
+            window.location.reload();
             return;
         }
         await supabase.auth.signOut();
         setUser(null);
         setUserPermissions([]);
+        window.location.reload();
     };
 
     // Criar usuário (admin)
