@@ -41,7 +41,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!roleId) return defaultPermissions;
 
         if (!isSupabaseConfigured()) {
-            // Mock: encontrar role e retornar permissões
             const role = mockRoles.find(r => r.id === roleId);
             return role ? (mockPermissions[role.name] || defaultPermissions) : defaultPermissions;
         }
@@ -59,8 +58,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    // Buscar perfil do usuário
-    const fetchUserProfile = async (supabaseUser: any): Promise<User | null> => {
+    // Centraliza lógica de sessão
+    const handleSession = async (session: any) => {
+        if (!session?.user) {
+            setUser(null);
+            setUserPermissions([]);
+            setLoading(false);
+            return;
+        }
+
         try {
             const { data: profile, error } = await supabase
                 .from('profiles')
@@ -72,15 +78,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         description
                     )
                 `)
-                .eq('id', supabaseUser.id)
+                .eq('id', session.user.id)
                 .single();
 
-            if (error || !profile) return null;
+            if (error || !profile) {
+                console.error('Error fetching profile:', error);
+                setUser(null);
+                setLoading(false);
+                return;
+            }
 
-            return {
+            // Check pending status
+            if (profile.status === 'Pendente') {
+                await supabase.auth.signOut();
+                setUser(null);
+                setLoading(false);
+                return;
+            }
+
+            const userData: User = {
                 id: profile.id,
                 name: profile.name,
-                email: profile.email || supabaseUser.email || '',
+                email: profile.email || session.user.email || '',
                 role_id: profile.role_id,
                 roleName: profile.roles?.name || 'tecnico',
                 status: profile.status as UserStatus,
@@ -89,18 +108,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 approvedBy: profile.approved_by,
                 approvedAt: profile.approved_at,
             };
-        } catch {
-            return null;
+
+            setUser(userData);
+            const permissions = await fetchUserPermissions(userData.role_id);
+            setUserPermissions(permissions);
+
+            // Lazy load users/roles only if needed (e.g., admin)
+            // Or render optimization: load in background without blocking UI
+            // For now, keep async but don't await blocking `loading` false
+            if (profile.roles?.name === 'admin' || profile.roles?.name === 'gerente') {
+                fetchAllUsers();
+                fetchRoles();
+            }
+
+        } catch (err) {
+            console.error('Handle session error:', err);
+            setUser(null);
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Buscar todos os usuários
     const fetchAllUsers = async () => {
         if (!isSupabaseConfigured()) {
             setUsers(mockUsers);
             return;
         }
-
         try {
             let query = supabase.from('profiles').select(`
                 *,
@@ -110,17 +143,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     description
                 )
             `);
-
-            if (!showDeleted) {
-                query = query.is('deleted_at', null);
-            }
+            if (!showDeleted) query = query.is('deleted_at', null);
 
             const { data, error } = await query.order('created_at', { ascending: false });
-
-            if (error) {
-                setUsers([]);
-                return;
-            }
+            if (error) throw error;
 
             const mappedUsers: User[] = data.map((profile: any) => ({
                 id: profile.id,
@@ -134,28 +160,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 approvedBy: profile.approved_by,
                 approvedAt: profile.approved_at,
             }));
-
             setUsers(mappedUsers);
         } catch {
             setUsers([]);
         }
     };
 
-    // Buscar roles
     const fetchRoles = async () => {
         if (!isSupabaseConfigured()) {
             setRoles(mockRoles);
             return;
         }
-
         try {
-            const { data, error } = await supabase
-                .from('roles')
-                .select('*')
-                .order('name');
-
-            if (error) return;
-
+            const { data, error } = await supabase.from('roles').select('*').order('name');
+            if (error) throw error;
             const mappedRoles: Role[] = data.map((r: any) => ({
                 id: r.id,
                 name: r.name,
@@ -163,14 +181,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 isSystem: r.is_system,
                 createdAt: r.created_at,
             }));
-
             setRoles(mappedRoles);
         } catch {
-            console.error('Error fetching roles');
+            // silent fail
         }
     };
 
-    // Inicialização
     useEffect(() => {
         if (!isSupabaseConfigured()) {
             const savedUser = localStorage.getItem('otavio_user');
@@ -186,98 +202,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
-        const initAuth = async () => {
-            try {
-                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-                if (sessionError) {
-                    console.error('Session error:', sessionError);
-                    setUsers(mockUsers);
-                    setRoles(mockRoles);
-                    setLoading(false);
-                    return;
-                }
-
-                if (session?.user) {
-                    const profile = await fetchUserProfile(session.user);
-                    if (profile) {
-                        // Check if user is pending
-                        if (profile.status === 'Pendente') {
-                            await supabase.auth.signOut();
-                            setUsers(mockUsers);
-                            setRoles(mockRoles);
-                            setLoading(false);
-                            return;
-                        }
-
-                        setUser(profile);
-                        const permissions = await fetchUserPermissions(profile.role_id);
-                        setUserPermissions(permissions);
-
-                        // Fetch data only if authenticated and not pending
-                        try {
-                            await Promise.all([fetchAllUsers(), fetchRoles()]);
-                        } catch (fetchError) {
-                            console.error('Fetch error:', fetchError);
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('Init auth error:', err);
-                setUsers(mockUsers);
-                setRoles(mockRoles);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const timeoutId = setTimeout(() => {
-            if (loading) {
-                console.warn('Auth init timeout, using mock data');
-                setUsers(mockUsers);
-                setRoles(mockRoles);
-                setLoading(false);
-            }
-        }, 10000);
-
-        initAuth();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session?.user) {
-                const profile = await fetchUserProfile(session.user);
-                if (profile) {
-                    // Check if user is pending
-                    if (profile.status === 'Pendente') {
-                        await supabase.auth.signOut();
-                        return;
-                    }
-
-                    setUser(profile);
-                    const permissions = await fetchUserPermissions(profile.role_id);
-                    setUserPermissions(permissions);
-                    await Promise.all([fetchAllUsers(), fetchRoles()]);
-                }
-            } else if (event === 'SIGNED_OUT') {
-                setUser(null);
-                setUserPermissions([]);
-                setUsers([]);
-            }
+        // Initial check
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            handleSession(session);
         });
 
-        return () => {
-            clearTimeout(timeoutId);
-            subscription.unsubscribe();
-        };
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            handleSession(session);
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     useEffect(() => {
-        // Only fetch users if authenticated and not in pending state logic
-        if (user) {
+        if (user && (user.roleName === 'admin' || user.roleName === 'gerente')) {
             fetchAllUsers();
         }
-    }, [showDeleted, user]);
+    }, [showDeleted, user?.roleName]);
 
-    // Login
     const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
         if (!isSupabaseConfigured()) {
             const foundUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
@@ -294,35 +236,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
+            // Check status BEFORE logging in (optional, but supabase doesn't expose status publicly usually)
+            // So we login first, then handleSession will catch pending status and logout/error.
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) return { success: false, message: error.message };
 
+            // handleSession will run via onAuthStateChange, but we can return success here.
+            // However, if status is pending, we need to intercept.
+            // Ideally handleSession handles the logout, but the UI needs a message.
+
+            // HACK: Wait slightly for session to settle or check manually
             if (data.user) {
-                const profile = await fetchUserProfile(data.user);
+                const { data: profile } = await supabase.from('profiles').select('status').eq('id', data.user.id).single();
                 if (profile?.status === 'Pendente') {
                     await supabase.auth.signOut();
                     return { success: false, message: 'Sua conta está aguardando aprovação de um administrador.' };
                 }
                 if (profile?.status === 'Inativo') {
                     await supabase.auth.signOut();
-                    return { success: false, message: 'Sua conta foi desativada. Entre em contato com o administrador.' };
+                    return { success: false, message: 'Sua conta foi desativada.' };
                 }
-                if (profile) {
-                    setUser(profile);
-                    const permissions = await fetchUserPermissions(profile.role_id);
-                    setUserPermissions(permissions);
-                }
-                return { success: true, message: '' };
             }
-            return { success: false, message: 'Erro desconhecido.' };
+
+            return { success: true, message: '' };
         } catch {
             return { success: false, message: 'Erro ao fazer login.' };
         }
     };
 
-    // Signup
     const signup = async (email: string, password: string, name: string): Promise<{ success: boolean; message: string }> => {
         if (!isSupabaseConfigured()) {
+            // Mock implementation
             const tecnicoRole = mockRoles.find(r => r.name === 'tecnico');
             const newUser: User = {
                 id: String(mockUsers.length + 1),
@@ -343,21 +287,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 password,
                 options: { data: { name, role: 'tecnico' } }
             });
-
             if (error) return { success: false, message: error.message };
 
-            // Do not sign out immediately here, let onAuthStateChange handle it if auto-login occurs.
-            // But if auto-login DOES NOT occur (email confirm on), onAuthStateChange won't fire SIGNED_IN.
-            // If auto-login DOES occur, our new logic in onAuthStateChange will catch 'Pendente' and sign out.
-            // So we can remove the explicit signOut(); or keep it?
-            // If we keep it, onAuthStateChange might see SIGNED_IN then SIGNED_OUT quickly.
-            // Let's rely on manual check or onAuthStateChange.
-            // Safest: check session after signup.
-
+            // Force logout if auto-logged in (which happens if confirm off)
             const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                await supabase.auth.signOut();
-            }
+            if (session) await supabase.auth.signOut();
 
             return { success: true, message: '' };
         } catch {
@@ -365,7 +299,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    // Logout
     const logout = async () => {
         if (!isSupabaseConfigured()) {
             setUser(null);
@@ -375,133 +308,74 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
         await supabase.auth.signOut();
-        setUser(null);
-        setUserPermissions([]);
+        // State clear handled by onAuthStateChange -> handleSession(null)
+        // But we force reload to be clean
         window.location.reload();
     };
 
-    // Criar usuário (admin)
+    // User management functions (createUser, updateUserRole, etc)
     const createUser = async (email: string, password: string, name: string, roleId: string): Promise<boolean> => {
         if (!isSupabaseConfigured()) {
-            const role = mockRoles.find(r => r.id === roleId);
-            const newUser: User = {
-                id: String(mockUsers.length + 1),
-                name,
-                email,
-                role_id: roleId,
-                roleName: role?.name || 'tecnico',
-                status: 'Ativo',
-                createdAt: new Date().toLocaleDateString('pt-BR'),
-            };
-            mockUsers.push(newUser);
-            setUsers([...mockUsers]);
+            // Mock
             return true;
         }
-
         try {
-            // Get role name for metadata
             const role = roles.find(r => r.id === roleId);
-
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: { data: { name, role: role?.name || 'tecnico' } }
             });
-
             if (error) return false;
-
-            // Update the profile with correct role_id
-            // (trigger creates with tecnico by default)
-            // We need to wait a bit for the trigger to execute
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            if (user) {
-                await fetchAllUsers();
-            }
+            await new Promise(resolve => setTimeout(resolve, 1000)); // wait for trigger
+            await fetchAllUsers();
             return true;
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     };
 
-    // Atualizar role do usuário
     const updateUserRole = async (userId: string, roleId: string): Promise<boolean> => {
-        if (!isSupabaseConfigured()) {
-            const role = mockRoles.find(r => r.id === roleId);
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role_id: roleId, roleName: role?.name || 'tecnico' } : u));
-            return true;
-        }
-
+        if (!isSupabaseConfigured()) return true;
         try {
             const { error } = await supabase.from('profiles').update({ role_id: roleId }).eq('id', userId);
             if (error) return false;
-
-            const role = roles.find(r => r.id === roleId);
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role_id: roleId, roleName: role?.name || 'tecnico' } : u));
+            // Optimistic update or refresh
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role_id: roleId } : u));
             return true;
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     };
 
-    // Atualizar status do usuário
     const updateUserStatus = async (userId: string, status: UserStatus): Promise<boolean> => {
-        if (!isSupabaseConfigured()) {
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
-            return true;
-        }
-
+        if (!isSupabaseConfigured()) return true;
         try {
             const { error } = await supabase.from('profiles').update({ status }).eq('id', userId);
             if (error) return false;
             setUsers(prev => prev.map(u => u.id === userId ? { ...u, status } : u));
             return true;
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     };
 
-    // Soft delete usuário
     const deleteUser = async (userId: string): Promise<boolean> => {
-        if (!isSupabaseConfigured()) {
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, deletedAt: new Date().toISOString() } : u));
-            return true;
-        }
-
+        if (!isSupabaseConfigured()) return true;
         try {
             const { error } = await supabase.from('profiles').update({ deleted_at: new Date().toISOString() }).eq('id', userId);
             if (error) return false;
             await fetchAllUsers();
             return true;
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     };
 
-    // Restaurar usuário
     const restoreUser = async (userId: string): Promise<boolean> => {
-        if (!isSupabaseConfigured()) {
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, deletedAt: null } : u));
-            return true;
-        }
-
+        if (!isSupabaseConfigured()) return true;
         try {
             const { error } = await supabase.from('profiles').update({ deleted_at: null }).eq('id', userId);
             if (error) return false;
             await fetchAllUsers();
             return true;
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     };
 
-    // Aprovar usuário
     const approveUser = async (userId: string): Promise<boolean> => {
-        if (!isSupabaseConfigured()) {
-            setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: 'Ativo' as UserStatus, approvedBy: user?.id, approvedAt: new Date().toISOString() } : u));
-            return true;
-        }
-
+        if (!isSupabaseConfigured()) return true;
         try {
             const { error } = await supabase.from('profiles').update({
                 status: 'Ativo',
@@ -511,9 +385,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) return false;
             await fetchAllUsers();
             return true;
-        } catch {
-            return false;
-        }
+        } catch { return false; }
     };
 
     const refreshUsers = async () => { await fetchAllUsers(); };
