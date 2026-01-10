@@ -205,11 +205,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     console.log('Auth: User found, fetching profile...');
                     const profile = await fetchUserProfile(session.user);
                     if (profile) {
+                        // Check if user is pending
+                        if (profile.status === 'Pendente') {
+                            console.log('Auth: User is pending, signing out...');
+                            await supabase.auth.signOut();
+                            setUsers(mockUsers);
+                            setRoles(mockRoles);
+                            setLoading(false);
+                            return;
+                        }
+
                         setUser(profile);
                         const permissions = await fetchUserPermissions(profile.role_id);
                         setUserPermissions(permissions);
 
-                        // Fetch data only if authenticated
+                        // Fetch data only if authenticated and not pending
                         try {
                             console.log('Auth: Fetching users and roles...');
                             await Promise.all([fetchAllUsers(), fetchRoles()]);
@@ -246,11 +256,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 console.log('Auth: Signed in, fetching data...');
                 const profile = await fetchUserProfile(session.user);
                 if (profile) {
+                    // Check if user is pending
+                    if (profile.status === 'Pendente') {
+                        console.log('Auth: User is pending (onAuthStateChange), signing out...');
+                        await supabase.auth.signOut();
+                        return;
+                    }
+
                     setUser(profile);
                     const permissions = await fetchUserPermissions(profile.role_id);
                     setUserPermissions(permissions);
+                    await Promise.all([fetchAllUsers(), fetchRoles()]);
                 }
-                await Promise.all([fetchAllUsers(), fetchRoles()]);
             } else if (event === 'SIGNED_OUT') {
                 console.log('Auth: Signed out, clearing state');
                 setUser(null);
@@ -266,8 +283,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, []);
 
     useEffect(() => {
-        fetchAllUsers();
-    }, [showDeleted]);
+        // Only fetch users if authenticated and not in pending state logic
+        if (user) {
+            fetchAllUsers();
+        }
+    }, [showDeleted, user]);
 
     // Login
     const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
@@ -337,7 +357,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             });
 
             if (error) return { success: false, message: error.message };
-            await supabase.auth.signOut();
+
+            // Do not sign out immediately here, let onAuthStateChange handle it if auto-login occurs.
+            // But if auto-login DOES NOT occur (email confirm on), onAuthStateChange won't fire SIGNED_IN.
+            // If auto-login DOES occur, our new logic in onAuthStateChange will catch 'Pendente' and sign out.
+            // So we can remove the explicit signOut(); or keep it?
+            // If we keep it, onAuthStateChange might see SIGNED_IN then SIGNED_OUT quickly.
+            // Let's rely on manual check or onAuthStateChange.
+            // Safest: check session after signup.
+
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                await supabase.auth.signOut();
+            }
+
             return { success: true, message: '' };
         } catch {
             return { success: false, message: 'Erro ao criar conta.' };
@@ -392,7 +425,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // We need to wait a bit for the trigger to execute
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            await fetchAllUsers();
+            if (user) {
+                await fetchAllUsers();
+            }
             return true;
         } catch {
             return false;
