@@ -109,22 +109,22 @@ export default function InsightsPage() {
 
                 <div className="flex bg-white dark:bg-card-dark p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
                     <button
-                        onClick={() => setActiveTab('missed')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'missed'
-                                ? 'bg-primary text-white shadow-md'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                            }`}
-                    >
-                        Demanda Não Atendida
-                    </button>
-                    <button
                         onClick={() => setActiveTab('success')}
                         className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'success'
-                                ? 'bg-emerald-500 text-white shadow-md'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            ? 'bg-emerald-500 text-white shadow-md'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                             }`}
                     >
                         Performance e Sucesso
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('missed')}
+                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'missed'
+                            ? 'bg-primary text-white shadow-md'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
+                    >
+                        Demanda Não Atendida
                     </button>
                 </div>
             </header>
