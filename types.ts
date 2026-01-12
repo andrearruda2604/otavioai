@@ -10,6 +10,7 @@ export interface KanbanCardData {
     date: string;
     user: string;
     verified?: boolean;
+    chatId?: string;
 }
 
 export interface ChatMessage {

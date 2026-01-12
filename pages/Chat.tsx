@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -20,6 +21,7 @@ interface ChatSession {
 
 export default function ChatPage() {
     const { user } = useAuth();
+    const location = useLocation();
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -30,15 +32,19 @@ export default function ChatPage() {
 
     // Mock initial data if no real data
     useEffect(() => {
-        if (!process.env.VITE_SUPABASE_URL) {
-            setSessions([
-                { id: '1', contact_name: 'Ana Souza', company_name: 'Auto Peças Central', is_ai_enabled: true, updated_at: new Date().toISOString() },
-                { id: '2', contact_name: 'Henrique Silva', company_name: 'Marinho & Filhos', is_ai_enabled: false, updated_at: new Date().toISOString() }
-            ]);
-            setLoading(false);
-            return;
-        }
-        fetchSessions();
+        const init = async () => {
+            if (!process.env.VITE_SUPABASE_URL) {
+                setSessions([
+                    { id: '1', contact_name: 'Ana Souza', company_name: 'Auto Peças Central', is_ai_enabled: true, updated_at: new Date().toISOString() },
+                    { id: '2', contact_name: 'Henrique Silva', company_name: 'Marinho & Filhos', is_ai_enabled: false, updated_at: new Date().toISOString() }
+                ]);
+                setLoading(false);
+                return;
+            }
+            await fetchSessions();
+        };
+
+        init();
 
         const channel = supabase
             .channel('public:chats')
@@ -50,12 +56,23 @@ export default function ChatPage() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
+    // Handle URL query param for auto-selection
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search);
+        const urlChatId = searchParams.get('chatId');
+        if (urlChatId) {
+            setSelectedSessionId(urlChatId);
+        }
+    }, [location.search]);
+
     useEffect(() => {
         if (!selectedSessionId) return;
 
         fetchMessages(selectedSessionId);
 
         // Find current session to set AI toggle state
+        // Note: sessions might be empty effectively if loading, but this runs on selectedSessionId change too.
+        // We might need to run this when sessions update as well if selectedSessionId is already set.
         const session = sessions.find(s => s.id === selectedSessionId);
         if (session) setAiEnabled(session.is_ai_enabled);
 
@@ -73,7 +90,7 @@ export default function ChatPage() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [selectedSessionId]);
+    }, [selectedSessionId, sessions]); // Added sessions to dependecy to retry finding session if it loads later
 
     const fetchSessions = async () => {
         try {
@@ -188,10 +205,10 @@ export default function ChatPage() {
                                 <span className="material-icons-round">arrow_back</span>
                             </button>
                             <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-bold">
-                                {sessions.find(s => s.id === selectedSessionId)?.contact_name.charAt(0)}
+                                {sessions.find(s => s.id === selectedSessionId)?.contact_name.charAt(0) || '?'}
                             </div>
                             <div>
-                                <h3 className="font-bold dark:text-white">{sessions.find(s => s.id === selectedSessionId)?.contact_name}</h3>
+                                <h3 className="font-bold dark:text-white">{sessions.find(s => s.id === selectedSessionId)?.contact_name || 'Carregando...'}</h3>
                                 <p className="text-xs text-slate-500">{sessions.find(s => s.id === selectedSessionId)?.company_name}</p>
                             </div>
                         </div>
