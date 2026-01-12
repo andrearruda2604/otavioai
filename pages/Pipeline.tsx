@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { KanbanCardData } from '../types';
 
 interface KanbanColumnProps {
@@ -16,7 +17,6 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards 
         if (card.chatId) {
             navigate(`/chat?chatId=${card.chatId}`);
         } else {
-            // Fallback if no chat ID, just go to chat or stay (optional: notify user)
             navigate('/chat');
         }
     };
@@ -30,44 +30,142 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards 
                 </div>
                 <span className={`px-2 py-0.5 text-xs font-bold bg-${color}-100 text-${color}-600 dark:bg-${color}-500/10 dark:text-${color}-400 rounded-full`}>{count}</span>
             </div>
-            <div className="space-y-4">
-                {cards.map((card, i) => (
-                    <div
-                        key={i}
-                        onClick={() => handleCardClick(card)}
-                        className="bg-white dark:bg-card-dark p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer active:scale-[0.98] transform duration-200"
-                    >
-                        <div className={`absolute left-0 top-0 bottom-0 w-1 bg-${color}-500 opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-                        <div className="flex justify-between items-start mb-4">
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate pr-2">{card.title}</h4>
-                            <span className="material-icons-round text-slate-300 text-sm group-hover:text-primary transition-colors">open_in_new</span>
+            <div className={`space-y-4 min-h-[100px] ${cards.length === 0 ? 'opacity-50 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center' : ''}`}>
+                {cards.length === 0 ? (
+                    <span className="text-xs text-slate-400">Vazio</span>
+                ) : (
+                    cards.map((card, i) => (
+                        <div
+                            key={i}
+                            onClick={() => handleCardClick(card)}
+                            className="bg-white dark:bg-card-dark p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer active:scale-[0.98] transform duration-200"
+                        >
+                            <div className={`absolute left-0 top-0 bottom-0 w-1 bg-${color}-500 opacity-0 group-hover:opacity-100 transition-opacity`}></div>
+                            <div className="flex justify-between items-start mb-4">
+                                <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate pr-2">{card.title}</h4>
+                                <span className="material-icons-round text-slate-300 text-sm group-hover:text-primary transition-colors">open_in_new</span>
+                            </div>
+                            <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400 mb-4">
+                                <p className="font-mono text-xs text-slate-400">#{card.id}</p>
+                                <p>{card.date}</p>
+                                <p className="font-medium text-slate-700 dark:text-slate-300 truncate">{card.user}</p>
+                            </div>
+                            <div className="flex items-center justify-end">
+                                {card.verified ? (
+                                    <div className="flex items-center gap-1 text-accent text-xs font-bold bg-accent/10 px-2 py-1 rounded-lg">
+                                        <span className="material-icons-round text-xs">check_circle</span>
+                                        Verificado
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 group/check" onClick={(e) => e.stopPropagation()}>
+                                        <span className="text-xs font-medium text-slate-400 group-hover/check:text-slate-600 dark:group-hover/check:text-slate-300 transition-colors">Verificar</span>
+                                        <input className="rounded text-primary focus:ring-primary border-slate-200 dark:border-slate-700 dark:bg-slate-800" type="checkbox" />
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400 mb-4">
-                            <p className="font-mono text-xs text-slate-400">{card.id}</p>
-                            <p>{card.date}</p>
-                            <p className="font-medium text-slate-700 dark:text-slate-300">{card.user}</p>
-                        </div>
-                        <div className="flex items-center justify-end">
-                            {card.verified ? (
-                                <div className="flex items-center gap-1 text-accent text-xs font-bold bg-accent/10 px-2 py-1 rounded-lg">
-                                    <span className="material-icons-round text-xs">check_circle</span>
-                                    Verificado
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 group/check" onClick={(e) => e.stopPropagation()}>
-                                    <span className="text-xs font-medium text-slate-400 group-hover/check:text-slate-600 dark:group-hover/check:text-slate-300 transition-colors">Verificar</span>
-                                    <input className="rounded text-primary focus:ring-primary border-slate-200 dark:border-slate-700 dark:bg-slate-800" type="checkbox" />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
         </div>
     );
 };
 
 export default function PipelinePage() {
+    const [columns, setColumns] = useState<{ [key: string]: KanbanCardData[] }>({
+        'Not Found': [],
+        'Pending Feedback': [],
+        'Cancelled': [],
+        'Deal': []
+    });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchPipelineData();
+
+        // Realtime subscription for requests updates
+        const channel = supabase
+            .channel('public:requests')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+                fetchPipelineData();
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, []);
+
+    const fetchPipelineData = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('requests')
+                .select(`
+                    request_id,
+                    created_at,
+                    status,
+                    total_price,
+                    ordered_prods,
+                    clients (
+                        client_id,
+                        name_first,
+                        name_last,
+                        whatsapp
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            // Map data to columns
+            const newColumns: { [key: string]: KanbanCardData[] } = {
+                'Not Found': [],
+                'Pending Feedback': [],
+                'Cancelled': [],
+                'Deal': []
+            };
+
+            // Mapping function from DB Status to UI Column
+            const mapStatus = (status: string | null) => {
+                if (!status) return 'Not Found'; // Default column
+                const s = status.toLowerCase();
+                if (s.includes('deal') || s.includes('won') || s.includes('closed')) return 'Deal';
+                if (s.includes('cancel') || s.includes('lost')) return 'Cancelled';
+                if (s.includes('feedback') || s.includes('quota') || s.includes('wait')) return 'Pending Feedback';
+                return 'Not Found'; // Fallback for 'Open', 'New', etc.
+            };
+
+            data?.forEach((req: any) => {
+                const columnTitle = mapStatus(req.status);
+
+                // Extract title from ordered_prods or default
+                let title = "Solicitação";
+                if (req.ordered_prods && Array.isArray(req.ordered_prods) && req.ordered_prods.length > 0) {
+                    title = req.ordered_prods[0].prod_title || "Produto sem nome";
+                }
+
+                const clientName = req.clients ? `${req.clients.name_first || ''} ${req.clients.name_last || ''}`.trim() : 'Desconhecido';
+
+                const card: KanbanCardData = {
+                    id: req.request_id.toString(),
+                    title: title,
+                    date: new Date(req.created_at).toLocaleDateString('pt-BR'),
+                    user: clientName,
+                    chatId: req.clients?.whatsapp, // Ensuring link to chat
+                    verified: !!req.total_price // Dummy verification logic
+                };
+
+                if (newColumns[columnTitle]) {
+                    newColumns[columnTitle].push(card);
+                }
+            });
+
+            setColumns(newColumns);
+        } catch (error) {
+            console.error('Error fetching pipeline:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <main className="p-8">
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -82,24 +180,20 @@ export default function PipelinePage() {
                     </div>
                 </div>
             </header>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-                <KanbanColumn title="Não Encontrado" count={44} color="rose" cards={[
-                    { title: "Lanterna Traseira", id: "#1000", date: "09/01/2026", user: "Renata Moura", chatId: "1" },
-                    { title: "Tulipa Câmbio", id: "#1000", date: "09/01/2026", user: "Renata Moura" }
-                ]} />
-                <KanbanColumn title="Sem Feedback" count={54} color="amber" cards={[
-                    { title: "Lanterna Traseira", id: "#1001", date: "08/01/2026", user: "Vinicius Melo" },
-                    { title: "Pastilha de Freio Dianteira", id: "#1004", date: "07/01/2026", user: "Isabela Costa", chatId: "2" }
-                ]} />
-                <KanbanColumn title="Cancelado" count={33} color="slate" cards={[
-                    { title: "Tulipa Câmbio", id: "#1003", date: "07/01/2026", user: "Lucas Ribeiro", verified: true },
-                    { title: "Retrovisor Esquerdo", id: "#1005", date: "06/01/2026", user: "Vinicius Melo", verified: true }
-                ]} />
-                <KanbanColumn title="Deal" count={39} color="primary" cards={[
-                    { title: "Alternador", id: "#1000", date: "09/01/2026", user: "Renata Moura" },
-                    { title: "Difusor de Ar", id: "#1000", date: "09/01/2026", user: "Renata Moura", verified: true }
-                ]} />
-            </div>
+
+            {loading ? (
+                <div className="flex items-center justify-center h-64 text-slate-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-2"></div>
+                    Carregando Pipeline...
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} />
+                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} />
+                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} />
+                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} />
+                </div>
+            )}
         </main>
     );
 }
