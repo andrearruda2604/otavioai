@@ -88,31 +88,25 @@ export default function InsightsPage() {
                 setTopBrands(aggregate('car_brand'));
             }
 
-            // 2. Fetch Missed Sales (Status != Deal)
-            // Ideally we check 'requests' status or 'status' in requests_products
-            // Assuming 'NotFound' or 'Cancelled' in requests table implies "Demanda Não Atendida"
-            const { data: requestsData, error: reqError } = await supabase
-                .from('requests')
-                .select('ordered_prods, created_at, status')
+            // 2. Fetch Missed Sales (Status != Deal) using requests_products
+            // This table has the direct 'prod_title' and item-level status
+            const { data: productsDataMissed, error: reqError } = await supabase
+                .from('requests_products')
+                .select('prod_title, created_at, status')
                 .or('status.ilike.%cancel%,status.ilike.%not found%,status.ilike.%lost%')
+                .order('created_at', { ascending: false })
                 .limit(20);
 
             if (reqError) throw reqError;
 
-            if (requestsData) {
-                const mappedMissed = requestsData.map((r: any, i: number) => {
-                    let prodName = "Peça não identificada";
-                    if (r.ordered_prods && r.ordered_prods.length > 0) {
-                        prodName = r.ordered_prods[0].prod_title || prodName;
-                    }
-                    return {
-                        id: i.toString(),
-                        product_name: prodName,
-                        frequency: 1, // Hard to aggregate complex JSON without more logic, showing individual rows for now
-                        related_vehicle: 'N/A', // Would need client/vehicle info
-                        last_requested: new Date(r.created_at).toLocaleDateString()
-                    };
-                });
+            if (productsDataMissed) {
+                const mappedMissed = productsDataMissed.map((p: any, i: number) => ({
+                    id: i.toString(),
+                    product_name: p.prod_title || "Peça não identificada",
+                    frequency: 1,
+                    related_vehicle: 'N/A',
+                    last_requested: new Date(p.created_at).toLocaleDateString()
+                }));
                 setMissedSales(mappedMissed);
             }
 

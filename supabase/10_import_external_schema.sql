@@ -44,6 +44,8 @@ CREATE TABLE public.clients (
   cep text,
   last_message timestamp with time zone DEFAULT now(),
   fup_done boolean DEFAULT false,
+  company_name text,
+  archived boolean DEFAULT false,
   CONSTRAINT clients_pkey PRIMARY KEY (client_id)
 );
 
@@ -134,6 +136,7 @@ CREATE TABLE public.requests (
   ordered_prods jsonb,
   prods_price numeric,
   total_price numeric,
+  archived boolean DEFAULT false,
   CONSTRAINT requests_pkey PRIMARY KEY (request_id),
   CONSTRAINT requests_client_id_fkey FOREIGN KEY (client_id) REFERENCES public.clients(client_id)
 );
