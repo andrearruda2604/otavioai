@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     LineChart,
     Line,
@@ -25,6 +26,7 @@ const CategoryBar: React.FC<{ label: string; percent: number; color: string }> =
 );
 
 export default function DashboardPage() {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [kpis, setKpis] = useState({
         requests: 0,
@@ -68,6 +70,7 @@ export default function DashboardPage() {
                     status,
                     total_price,
                     ordered_prods,
+                    client_id,
                     clients (name_first, name_last, whatsapp, company_name)
                 `)
                 .order('created_at', { ascending: false });
@@ -133,7 +136,8 @@ export default function DashboardPage() {
                     time: new Date(r.created_at).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
                     company: r.clients?.company_name || 'Particular',
                     status: r.status || 'Pendente',
-                    statusColor: r.status?.toLowerCase().includes('deal') ? 'green' : (r.status?.toLowerCase().includes('cancel') ? 'red' : 'orange')
+                    statusColor: r.status?.toLowerCase().includes('deal') ? 'green' : (r.status?.toLowerCase().includes('cancel') ? 'red' : 'orange'),
+                    clientId: r.client_id
                 }));
                 setInteractions(recent);
             }
@@ -227,7 +231,11 @@ export default function DashboardPage() {
                             <h3 className="text-lg font-bold mb-6 dark:text-white">Últimas Interações</h3>
                             <div className="space-y-4">
                                 {interactions.map((item, i) => (
-                                    <InteractionItem key={i} {...item} />
+                                    <InteractionItem
+                                        key={i}
+                                        {...item}
+                                        onClick={() => navigate(`/chat?chatId=${item.clientId}`)}
+                                    />
                                 ))}
                                 {interactions.length === 0 && <p className="text-slate-500">Nenhuma interação recente.</p>}
                             </div>
