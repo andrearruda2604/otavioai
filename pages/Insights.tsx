@@ -92,7 +92,7 @@ export default function InsightsPage() {
             // Filter where PARENT request status is 'Cancelled' or 'Not Found'
             const { data: productsDataMissed, error: reqError } = await supabase
                 .from('requests_products')
-                .select('prod_title, car_brand, car_model, car_year, created_at, requests!inner(status)')
+                .select('prod_title, car_brand, car_model, car_year, created_at, requests!inner(status, client_id)')
                 .or('status.ilike.%cancel%,status.ilike.%not found%', { foreignTable: 'requests' }) // Filter on joined table
                 .order('created_at', { ascending: false })
                 .limit(20);
@@ -113,7 +113,8 @@ export default function InsightsPage() {
                         product_name: parts.join(' / ') || "Peça não identificada",
                         frequency: 1,
                         related_vehicle: 'N/A',
-                        last_requested: new Date(p.created_at).toLocaleDateString()
+                        last_requested: new Date(p.created_at).toLocaleDateString(),
+                        client_id: p.requests?.client_id // Capture client_id for linking
                     };
                 });
                 setMissedSales(mappedMissed);
@@ -130,6 +131,12 @@ export default function InsightsPage() {
         // Search using the full concatenated string for better context
         const url = `https://www.google.com/shopping?hl=pt-BR&q=${encodeURIComponent(productName)}`;
         window.open(url, '_blank');
+    };
+
+    const handleViewConversation = (clientId: string) => {
+        if (clientId) {
+            window.location.href = `/chat?chatId=${clientId}`;
+        }
     };
 
     return (
@@ -182,7 +189,7 @@ export default function InsightsPage() {
                                             <tr>
                                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Peça / Veículo</th>
                                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Data</th>
-                                                <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-32">Ação</th>
+                                                <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-48">Ação</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -200,14 +207,24 @@ export default function InsightsPage() {
                                                         </td>
                                                         <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{sale.last_requested}</td>
                                                         <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
-                                                            <button
-                                                                onClick={() => handleGoogleSearch(sale.product_name)}
-                                                                className="text-primary hover:text-primary-dark font-medium text-sm hover:underline inline-flex items-center gap-1 transition-colors"
-                                                                title={`Consultar "${sale.product_name}" no Google Shopping`}
-                                                            >
-                                                                Consultar
-                                                                <span className="material-icons-round text-sm" style={{ fontSize: '16px' }}>open_in_new</span>
-                                                            </button>
+                                                            <div className="flex items-center justify-end gap-3">
+                                                                <button
+                                                                    onClick={() => handleViewConversation(sale.client_id)}
+                                                                    className="text-slate-500 hover:text-primary font-medium text-sm flex items-center gap-1 transition-colors"
+                                                                    title="Ver conversa original"
+                                                                >
+                                                                    <span className="material-icons-round text-sm" style={{ fontSize: '18px' }}>chat</span>
+                                                                    Conversa
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleGoogleSearch(sale.product_name)}
+                                                                    className="text-primary hover:text-primary-dark font-medium text-sm hover:underline inline-flex items-center gap-1 transition-colors"
+                                                                    title={`Consultar "${sale.product_name}" no Google Shopping`}
+                                                                >
+                                                                    Consultar
+                                                                    <span className="material-icons-round text-sm" style={{ fontSize: '16px' }}>open_in_new</span>
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))
