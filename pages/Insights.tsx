@@ -92,7 +92,7 @@ export default function InsightsPage() {
             // Filter where PARENT request status is 'Cancelled' or 'Not Found'
             const { data: productsDataMissed, error: reqError } = await supabase
                 .from('requests_products')
-                .select('prod_title, created_at, requests!inner(status)')
+                .select('prod_title, car_brand, car_model, car_year, created_at, requests!inner(status)')
                 .or('status.ilike.%cancel%,status.ilike.%not found%', { foreignTable: 'requests' }) // Filter on joined table
                 .order('created_at', { ascending: false })
                 .limit(20);
@@ -100,13 +100,22 @@ export default function InsightsPage() {
             if (reqError) throw reqError;
 
             if (productsDataMissed) {
-                const mappedMissed = productsDataMissed.map((p: any, i: number) => ({
-                    id: i.toString(),
-                    product_name: p.prod_title || "Peça não identificada",
-                    frequency: 1,
-                    related_vehicle: 'N/A',
-                    last_requested: new Date(p.created_at).toLocaleDateString()
-                }));
+                const mappedMissed = productsDataMissed.map((p: any, i: number) => {
+                    const parts = [
+                        p.prod_title,
+                        p.car_brand,
+                        p.car_model,
+                        p.car_year
+                    ].filter(Boolean); // Remove null/undefined/empty strings
+
+                    return {
+                        id: i.toString(),
+                        product_name: parts.join(' / ') || "Peça não identificada",
+                        frequency: 1,
+                        related_vehicle: 'N/A',
+                        last_requested: new Date(p.created_at).toLocaleDateString()
+                    };
+                });
                 setMissedSales(mappedMissed);
             }
 
@@ -118,12 +127,13 @@ export default function InsightsPage() {
     };
 
     const handleGoogleSearch = (productName: string) => {
+        // Search using the full concatenated string for better context
         const url = `https://www.google.com/shopping?hl=pt-BR&q=${encodeURIComponent(productName)}`;
         window.open(url, '_blank');
     };
 
     return (
-        <main className="p-8">
+        <main className="p-6 lg:p-10 max-w-[1600px] mx-auto">
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold dark:text-white">Insights & Analytics</h1>
@@ -162,35 +172,41 @@ export default function InsightsPage() {
                     {activeTab === 'missed' ? (
                         <div className="animate-fade-in space-y-6">
                             <div className="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                                     <h3 className="font-semibold text-lg dark:text-white">Oportunidades Perdidas (Status: Cancelado/Não Encontrado)</h3>
+                                    <span className="text-xs font-medium px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-md">Últimos 20 itens</span>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-slate-50 dark:bg-slate-800/50">
+                                        <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                                             <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Peça</th>
-                                                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Data</th>
-                                                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Ação</th>
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Peça / Veículo</th>
+                                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Data</th>
+                                                <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-32">Ação</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                                             {missedSales.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={3} className="px-6 py-4 text-center text-slate-500">Nenhum dado encontrado</td>
+                                                    <td colSpan={3} className="px-6 py-8 text-center text-slate-500 italic">Nenhum dado encontrado para este período.</td>
                                                 </tr>
                                             ) : (
                                                 missedSales.map((sale) => (
-                                                    <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                                        <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{sale.product_name}</td>
-                                                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{sale.last_requested}</td>
-                                                        <td className="px-6 py-4 text-sm text-right">
+                                                    <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                        <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">
+                                                            <div className="flex flex-col">
+                                                                <span>{sale.product_name}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{sale.last_requested}</td>
+                                                        <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
                                                             <button
                                                                 onClick={() => handleGoogleSearch(sale.product_name)}
-                                                                className="text-blue-600 dark:text-blue-400 font-medium text-sm hover:underline flex items-center justify-end gap-1"
+                                                                className="text-primary hover:text-primary-dark font-medium text-sm hover:underline inline-flex items-center gap-1 transition-colors"
+                                                                title={`Consultar "${sale.product_name}" no Google Shopping`}
                                                             >
-                                                                <span className="material-icons-round text-sm">search</span>
                                                                 Consultar
+                                                                <span className="material-icons-round text-sm" style={{ fontSize: '16px' }}>open_in_new</span>
                                                             </button>
                                                         </td>
                                                     </tr>
