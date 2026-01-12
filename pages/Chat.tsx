@@ -213,8 +213,37 @@ export default function ChatPage() {
     const getMessageContent = (msg: Message) => {
         if (!msg.message) return '';
         let text = msg.message.content || '';
-        text = text.replace(/\[Used tools:.*?\]/g, '').trim();
-        return text;
+
+        // Robust cleanup for N8N "Used tools" logs which may contain nested brackets [ ]
+        // Example: [Used tools: ... "pending": [] ... ] Actual message
+        while (text.includes('[Used tools:')) {
+            const startIndex = text.indexOf('[Used tools:');
+            let depth = 0;
+            let endIndex = -1;
+
+            // Start scanning from the opening bracket of [Used tools:
+            for (let i = startIndex; i < text.length; i++) {
+                if (text[i] === '[') depth++;
+                else if (text[i] === ']') depth--;
+
+                if (depth === 0) {
+                    endIndex = i;
+                    break;
+                }
+            }
+
+            if (endIndex !== -1) {
+                // Remove the block including brackets
+                text = text.slice(0, startIndex) + text.slice(endIndex + 1);
+            } else {
+                // Malformed/unclosed block, safety break to avoid infinite loop
+                // Try simple regex fallback or just break
+                text = text.replace(/\[Used tools:[\s\S]*?\]/g, '');
+                break;
+            }
+        }
+
+        return text.trim();
     };
 
     const getMessageRole = (msg: Message) => {
