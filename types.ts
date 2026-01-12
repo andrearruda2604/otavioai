@@ -11,6 +11,7 @@ export interface KanbanCardData {
     user: string;
     verified?: boolean;
     chatId?: string;
+    clientId?: number;
 }
 
 export interface ChatMessage {

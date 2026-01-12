@@ -8,9 +8,10 @@ interface KanbanColumnProps {
     count: number;
     color: string;
     cards: KanbanCardData[];
+    onArchive?: (card: KanbanCardData) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards, onArchive }) => {
     const navigate = useNavigate();
 
     const handleCardClick = (card: KanbanCardData) => {
@@ -50,18 +51,30 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards 
                                 <p>{card.date}</p>
                                 <p className="font-medium text-slate-700 dark:text-slate-300 truncate">{card.user}</p>
                             </div>
-                            <div className="flex items-center justify-end">
-                                {card.verified ? (
-                                    <div className="flex items-center gap-1 text-accent text-xs font-bold bg-accent/10 px-2 py-1 rounded-lg">
-                                        <span className="material-icons-round text-xs">check_circle</span>
-                                        Verificado
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-2 group/check" onClick={(e) => e.stopPropagation()}>
-                                        <span className="text-xs font-medium text-slate-400 group-hover/check:text-slate-600 dark:group-hover/check:text-slate-300 transition-colors">Verificar</span>
-                                        <input className="rounded text-primary focus:ring-primary border-slate-200 dark:border-slate-700 dark:bg-slate-800" type="checkbox" />
-                                    </div>
+                            <div className="flex items-center justify-between mt-4 border-t border-slate-100 dark:border-slate-800 pt-3">
+                                {onArchive && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onArchive(card); }}
+                                        className="text-xs font-medium text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1"
+                                        title="Arquivar conversa"
+                                    >
+                                        <span className="material-icons-round text-sm">archive</span>
+                                        Arquivar
+                                    </button>
                                 )}
+                                <div className="flex items-center justify-end">
+                                    {card.verified ? (
+                                        <div className="flex items-center gap-1 text-accent text-xs font-bold bg-accent/10 px-2 py-1 rounded-lg">
+                                            <span className="material-icons-round text-xs">check_circle</span>
+                                            Verificado
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 group/check" onClick={(e) => e.stopPropagation()}>
+                                            <span className="text-xs font-medium text-slate-400 group-hover/check:text-slate-600 dark:group-hover/check:text-slate-300 transition-colors">Verificar</span>
+                                            <input className="rounded text-primary focus:ring-primary border-slate-200 dark:border-slate-700 dark:bg-slate-800" type="checkbox" />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ))
@@ -72,6 +85,8 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards 
 };
 
 export default function PipelinePage() {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showArchived, setShowArchived] = useState(false);
     const [columns, setColumns] = useState<{ [key: string]: KanbanCardData[] }>({
         'Not Found': [],
         'Pending Feedback': [],
@@ -92,11 +107,12 @@ export default function PipelinePage() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, []);
+    }, [searchTerm, showArchived]);
 
     const fetchPipelineData = async () => {
         try {
-            const { data, error } = await supabase
+            setLoading(true);
+            let query = supabase
                 .from('requests')
                 .select(`
                     request_id,
@@ -104,6 +120,7 @@ export default function PipelinePage() {
                     status,
                     total_price,
                     ordered_prods,
+                    archived,
                     clients (
                         client_id,
                         name_first,
@@ -113,7 +130,27 @@ export default function PipelinePage() {
                 `)
                 .order('created_at', { ascending: false });
 
+            // Filter Archived
+            if (!showArchived) {
+                query = query.or('archived.is.null,archived.eq.false');
+            } else {
+                query = query.eq('archived', true);
+            }
+
+            const { data, error } = await query;
+
             if (error) throw error;
+
+            let filteredData = data || [];
+
+            if (searchTerm.trim()) {
+                const lower = searchTerm.toLowerCase();
+                filteredData = filteredData.filter((req: any) => {
+                    const clientName = req.clients ? `${req.clients.name_first} ${req.clients.name_last}`.toLowerCase() : '';
+                    const title = req.ordered_prods?.[0]?.prod_title?.toLowerCase() || '';
+                    return clientName.includes(lower) || title.includes(lower);
+                });
+            }
 
             // Map data to columns
             const newColumns: { [key: string]: KanbanCardData[] } = {
@@ -133,7 +170,7 @@ export default function PipelinePage() {
                 return 'Not Found'; // Fallback for 'Open', 'New', etc.
             };
 
-            data?.forEach((req: any) => {
+            filteredData.forEach((req: any) => {
                 const columnTitle = mapStatus(req.status);
 
                 // Extract title from ordered_prods or default
@@ -150,7 +187,8 @@ export default function PipelinePage() {
                     date: new Date(req.created_at).toLocaleDateString('pt-BR'),
                     user: clientName,
                     chatId: req.clients?.whatsapp, // Ensuring link to chat
-                    verified: !!req.total_price // Dummy verification logic
+                    verified: !!req.total_price, // Dummy verification logic
+                    clientId: req.clients?.client_id
                 };
 
                 if (newColumns[columnTitle]) {
@@ -166,6 +204,44 @@ export default function PipelinePage() {
         }
     };
 
+    const handleBulkArchive = async (card: KanbanCardData) => {
+        if (!card.clientId) return;
+
+        const confirm = window.confirm(
+            `Deseja arquivar TODOS os itens de ${card.user}?\n\nIsso irá remover os cards deste painel e arquivar a conversa.`
+        );
+
+        if (!confirm) return;
+
+        try {
+            setLoading(true);
+
+            // 1. Archive all requests for this client
+            const { error: reqError } = await supabase
+                .from('requests')
+                .update({ archived: true })
+                .eq('client_id', card.clientId);
+
+            if (reqError) throw reqError;
+
+            // 2. Archive the client (hides from Chat default view)
+            const { error: clientError } = await supabase
+                .from('clients')
+                .update({ archived: true })
+                .eq('client_id', card.clientId);
+
+            if (clientError) throw clientError;
+
+            // Refresh
+            fetchPipelineData();
+
+        } catch (error) {
+            console.error("Error archiving:", error);
+            alert("Erro ao arquivar itens.");
+            setLoading(false);
+        }
+    };
+
     return (
         <main className="p-8">
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
@@ -174,9 +250,30 @@ export default function PipelinePage() {
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Gerencie o follow-up de solicitações</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex gap-1 bg-white dark:bg-card-dark p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <button
+                            onClick={() => setShowArchived(false)}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${!showArchived ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                            Ativos
+                        </button>
+                        <button
+                            onClick={() => setShowArchived(true)}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${showArchived ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                            Arquivados
+                        </button>
+                    </div>
+
                     <div className="relative group">
                         <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                        <input className="pl-10 pr-4 py-2.5 bg-white dark:bg-card-dark border-none rounded-xl text-sm w-72 shadow-sm focus:ring-2 focus:ring-primary transition-all dark:text-white" placeholder="Buscar produto..." type="text" />
+                        <input
+                            className="pl-10 pr-4 py-2.5 bg-white dark:bg-card-dark border-none rounded-xl text-sm w-72 shadow-sm focus:ring-2 focus:ring-primary transition-all dark:text-white"
+                            placeholder="Buscar cliente ou produto..."
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
                 </div>
             </header>
@@ -188,10 +285,10 @@ export default function PipelinePage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} />
-                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} />
-                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} />
-                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} />
+                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onArchive={handleBulkArchive} />
                 </div>
             )}
         </main>
