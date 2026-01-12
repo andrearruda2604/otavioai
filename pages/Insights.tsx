@@ -88,12 +88,12 @@ export default function InsightsPage() {
                 setTopBrands(aggregate('car_brand'));
             }
 
-            // 2. Fetch Missed Sales (Status != Deal) using requests_products
-            // This table has the direct 'prod_title' and item-level status
+            // 2. Fetch Missed Sales (Status != Deal) using requests_products joined with requests
+            // Filter where PARENT request status is 'Cancelled' or 'Not Found'
             const { data: productsDataMissed, error: reqError } = await supabase
                 .from('requests_products')
-                .select('prod_title, created_at, status')
-                .or('status.ilike.%cancel%,status.ilike.%not found%,status.ilike.%lost%')
+                .select('prod_title, created_at, requests!inner(status)')
+                .or('status.ilike.%cancel%,status.ilike.%not found%', { foreignTable: 'requests' }) // Filter on joined table
                 .order('created_at', { ascending: false })
                 .limit(20);
 
@@ -115,6 +115,11 @@ export default function InsightsPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleGoogleSearch = (productName: string) => {
+        const url = `https://www.google.com/shopping?hl=pt-BR&q=${encodeURIComponent(productName)}`;
+        window.open(url, '_blank');
     };
 
     return (
@@ -180,7 +185,13 @@ export default function InsightsPage() {
                                                         <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{sale.product_name}</td>
                                                         <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{sale.last_requested}</td>
                                                         <td className="px-6 py-4 text-sm text-right">
-                                                            <button className="text-blue-600 dark:text-blue-400 font-medium text-sm hover:underline">Ver no Kanban</button>
+                                                            <button
+                                                                onClick={() => handleGoogleSearch(sale.product_name)}
+                                                                className="text-blue-600 dark:text-blue-400 font-medium text-sm hover:underline flex items-center justify-end gap-1"
+                                                            >
+                                                                <span className="material-icons-round text-sm">search</span>
+                                                                Consultar
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 ))
