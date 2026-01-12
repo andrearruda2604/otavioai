@@ -1,15 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-interface LostSale {
-    id: string;
-    product_name: string;
-    frequency: number;
-    related_vehicle: string;
-    last_requested: string;
-}
-
-interface TopMetric {
+interface MetricItem {
     id: string;
     label: string;
     value: number | string;
@@ -17,7 +9,7 @@ interface TopMetric {
     isUp?: boolean;
 }
 
-const MetricCard: React.FC<{ title: string; items: TopMetric[]; color: string; icon: string }> = ({ title, items, color, icon }) => (
+const MetricCard: React.FC<{ title: string; items: MetricItem[]; color: string; icon: string }> = ({ title, items, color, icon }) => (
     <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
             <div className={`w-10 h-10 rounded-xl bg-${color}-50 dark:bg-${color}-900/20 flex items-center justify-center text-${color}-600 dark:text-${color}-400`}>
@@ -48,54 +40,86 @@ const MetricCard: React.FC<{ title: string; items: TopMetric[]; color: string; i
 );
 
 export default function InsightsPage() {
-    const [activeTab, setActiveTab] = useState<'missed' | 'success'>('missed');
-    const [lostSales, setLostSales] = useState<LostSale[]>([]);
-    // Mock data for success metrics
-    const [topProducts] = useState<TopMetric[]>([
-        { id: '1', label: 'Óleo 5W30 Sintético', value: '428 und' },
-        { id: '2', label: 'Filtro de Óleo WOE-710', value: '315 und' },
-        { id: '3', label: 'Pastilha de Freio Gol G5', value: '210 kits' },
-        { id: '4', label: 'Lâmpada H7 Super Branca', value: '185 und' },
-    ]);
-    const [topVehicles] = useState<TopMetric[]>([
-        { id: '1', label: 'Fiat Strada', value: '1,240 buscas' },
-        { id: '2', label: 'VW Gol', value: '985 buscas' },
-        { id: '3', label: 'Toyota Corolla', value: '850 buscas' },
-        { id: '4', label: 'Chevrolet Onix', value: '720 buscas' },
-    ]);
-    const [topBrands] = useState<TopMetric[]>([
-        { id: '1', label: 'Fiat', value: '28%' },
-        { id: '2', label: 'Volkswagen', value: '22%' },
-        { id: '3', label: 'Chevrolet', value: '18%' },
-        { id: '4', label: 'Toyota', value: '15%' },
-    ]);
+    const [activeTab, setActiveTab] = useState<'missed' | 'success'>('success');
+    const [loading, setLoading] = useState(true);
+
+    // Metrics State
+    const [topProducts, setTopProducts] = useState<MetricItem[]>([]);
+    const [topVehicles, setTopVehicles] = useState<MetricItem[]>([]);
+    const [topBrands, setTopBrands] = useState<MetricItem[]>([]);
+    const [missedSales, setMissedSales] = useState<any[]>([]);
 
     useEffect(() => {
-        fetchData();
+        fetchAnalytics();
     }, []);
 
-    const fetchData = async () => {
-        // Fetch Lost Sales logic (Mocked + Real query hint)
+    const fetchAnalytics = async () => {
         try {
-            const { data: messages } = await supabase
-                .from('messages')
-                .select('*')
-                .eq('role', 'assistant')
-                .or('content.ilike.%não encontrei%,content.ilike.%não temos%')
-                .order('created_at', { ascending: false })
-                .limit(50);
+            setLoading(true);
 
-            // Mocking the result of parsing these messages
-            const mockLost: LostSale[] = [
-                { id: '1', product_name: 'Parachoque HB20 2023', frequency: 15, related_vehicle: 'Hyundai HB20', last_requested: 'Hoje' },
-                { id: '2', product_name: 'Retrovisor Onix Lado Direito', frequency: 12, related_vehicle: 'Chevrolet Onix', last_requested: 'Ontem' },
-                { id: '3', product_name: 'Farol Milha Renegade', frequency: 8, related_vehicle: 'Jeep Renegade', last_requested: '3 dias atrás' },
-                { id: '4', product_name: 'Lanterna Traseira Polo', frequency: 6, related_vehicle: 'VW Polo', last_requested: '5 dias atrás' },
-                { id: '5', product_name: 'Jogo Tapete Corolla', frequency: 4, related_vehicle: 'Toyota Corolla', last_requested: '1 semana atrás' },
-            ];
-            setLostSales(mockLost);
-        } catch (e) {
-            console.error(e);
+            // 1. Fetch Request Products for "Top" metrics
+            const { data: productsData, error: prodError } = await supabase
+                .from('requests_products')
+                .select('prod_title, car_model, car_brand')
+                .limit(1000); // Analyze sample of last 1000 items
+
+            if (prodError) throw prodError;
+
+            if (productsData) {
+                // Aggregation Helpers
+                const aggregate = (key: keyof typeof productsData[0]) => {
+                    const counts: Record<string, number> = {};
+                    productsData.forEach(p => {
+                        const val = p[key];
+                        if (val) counts[String(val)] = (counts[String(val)] || 0) + 1;
+                    });
+                    return Object.entries(counts)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 4)
+                        .map(([label, count], i) => ({
+                            id: i.toString(),
+                            label,
+                            value: `${count} und`
+                        }));
+                };
+
+                setTopProducts(aggregate('prod_title'));
+                setTopVehicles(aggregate('car_model'));
+                setTopBrands(aggregate('car_brand'));
+            }
+
+            // 2. Fetch Missed Sales (Status != Deal)
+            // Ideally we check 'requests' status or 'status' in requests_products
+            // Assuming 'NotFound' or 'Cancelled' in requests table implies "Demanda Não Atendida"
+            const { data: requestsData, error: reqError } = await supabase
+                .from('requests')
+                .select('ordered_prods, created_at, status')
+                .or('status.ilike.%cancel%,status.ilike.%not found%,status.ilike.%lost%')
+                .limit(20);
+
+            if (reqError) throw reqError;
+
+            if (requestsData) {
+                const mappedMissed = requestsData.map((r: any, i: number) => {
+                    let prodName = "Peça não identificada";
+                    if (r.ordered_prods && r.ordered_prods.length > 0) {
+                        prodName = r.ordered_prods[0].prod_title || prodName;
+                    }
+                    return {
+                        id: i.toString(),
+                        product_name: prodName,
+                        frequency: 1, // Hard to aggregate complex JSON without more logic, showing individual rows for now
+                        related_vehicle: 'N/A', // Would need client/vehicle info
+                        last_requested: new Date(r.created_at).toLocaleDateString()
+                    };
+                });
+                setMissedSales(mappedMissed);
+            }
+
+        } catch (error) {
+            console.error('Error fetching analytics:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -104,7 +128,7 @@ export default function InsightsPage() {
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
                 <div>
                     <h1 className="text-3xl font-bold dark:text-white">Insights & Analytics</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Inteligência de mercado baseada nas interações da IA</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Inteligência de mercado baseada nas interações reais</p>
                 </div>
 
                 <div className="flex bg-white dark:bg-card-dark p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
@@ -129,133 +153,72 @@ export default function InsightsPage() {
                 </div>
             </header>
 
-            {activeTab === 'missed' ? (
-                <div className="animate-fade-in space-y-6">
-                    {/* LOST SALES SECTION (Existing) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm col-span-2">
-                            <h3 className="font-semibold text-lg mb-6 dark:text-white">Top Oportunidades Perdidas</h3>
-                            <div className="space-y-4">
-                                {lostSales.map((item, idx) => (
-                                    <div key={idx} className="flex items-center gap-4 group">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-sm">
-                                            {idx + 1}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between mb-1">
-                                                <span className="font-medium text-slate-700 dark:text-slate-200">{item.product_name}</span>
-                                                <span className="text-sm text-slate-500">{item.frequency} buscas</span>
-                                            </div>
-                                            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2">
-                                                <div
-                                                    className="bg-blue-500 rounded-full h-2 transition-all duration-500 group-hover:bg-blue-400"
-                                                    style={{ width: `${(item.frequency / 20) * 100}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-6 text-white shadow-lg overflow-hidden relative">
-                            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                            <h3 className="text-xl font-bold mb-2">Potencial de Receita</h3>
-                            <p className="text-blue-100 text-sm mb-6">Estimativa mensal baseada em vendas perdidas</p>
-                            <div className="text-4xl font-bold mb-4">R$ 4.250,00</div>
-                            <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm border border-white/10">
-                                <p className="text-xs text-blue-50 leading-relaxed">
-                                    Adicionar <strong>Parachoque HB20</strong> ao estoque pode aumentar seu faturamento em até 15%.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                            <h3 className="font-semibold text-lg dark:text-white">Detalhamento das Buscas Sem Estoque</h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-slate-50 dark:bg-slate-800/50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Peça</th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Veículo</th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Frequência</th>
-                                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Última Busca</th>
-                                        <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Ação</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                    {lostSales.map((sale) => (
-                                        <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                            <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{sale.product_name}</td>
-                                            <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{sale.related_vehicle}</td>
-                                            <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                                                <span className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full text-xs">
-                                                    {sale.frequency}x
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{sale.last_requested}</td>
-                                            <td className="px-6 py-4 text-sm text-right">
-                                                <button className="text-blue-600 dark:text-blue-400 font-medium text-sm hover:underline">Buscar</button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+            {loading ? (
+                <div className="flex items-center justify-center h-64 text-slate-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-2"></div>
+                    Carregando Dados...
                 </div>
             ) : (
-                <div className="animate-fade-in grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* SUCCESS METRICS SECTION */}
-                    <MetricCard
-                        title="Produtos Mais Vendidos"
-                        items={topProducts}
-                        color="emerald"
-                        icon="shopping_bag"
-                    />
-                    <MetricCard
-                        title="Veículos Mais Pesquisados"
-                        items={topVehicles}
-                        color="indigo"
-                        icon="directions_car"
-                    />
-                    <MetricCard
-                        title="Top Marcas"
-                        items={topBrands}
-                        color="amber"
-                        icon="verified"
-                    />
-
-                    <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm md:col-span-2 lg:col-span-3">
-                        <h3 className="font-semibold text-lg mb-6 dark:text-white">Anos Mais Procurados (Heatmap)</h3>
-                        <div className="flex items-end justify-between gap-2 h-48">
-                            {[2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024].map((year, i) => {
-                                const heights = [30, 45, 55, 70, 85, 60, 90, 75, 50, 40];
-                                return (
-                                    <div key={year} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                                        <div className="w-full relative h-full flex items-end">
-                                            <div
-                                                className="w-full bg-indigo-50 dark:bg-indigo-900/20 rounded-t-lg transition-all duration-300 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/40"
-                                                style={{ height: '100%' }}
-                                            >
-                                                <div
-                                                    className="absolute bottom-0 w-full bg-indigo-500 rounded-t-lg transition-all duration-700"
-                                                    style={{ height: `${heights[i]}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                        <span className={`text-xs text-slate-500 dark:text-slate-400 ${year >= 2020 ? 'font-bold text-indigo-600 dark:text-indigo-400' : ''}`}>
-                                            {year}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                <>
+                    {activeTab === 'missed' ? (
+                        <div className="animate-fade-in space-y-6">
+                            <div className="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                                    <h3 className="font-semibold text-lg dark:text-white">Oportunidades Perdidas (Status: Cancelado/Não Encontrado)</h3>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-slate-50 dark:bg-slate-800/50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Peça</th>
+                                                <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Data</th>
+                                                <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                                            {missedSales.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={3} className="px-6 py-4 text-center text-slate-500">Nenhum dado encontrado</td>
+                                                </tr>
+                                            ) : (
+                                                missedSales.map((sale) => (
+                                                    <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                        <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">{sale.product_name}</td>
+                                                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{sale.last_requested}</td>
+                                                        <td className="px-6 py-4 text-sm text-right">
+                                                            <button className="text-blue-600 dark:text-blue-400 font-medium text-sm hover:underline">Ver no Kanban</button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    ) : (
+                        <div className="animate-fade-in grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <MetricCard
+                                title="Produtos Mais Solicitados"
+                                items={topProducts.length ? topProducts : [{ id: '0', label: 'Sem dados', value: '0' }]}
+                                color="emerald"
+                                icon="shopping_bag"
+                            />
+                            <MetricCard
+                                title="Veículos Populares"
+                                items={topVehicles.length ? topVehicles : [{ id: '0', label: 'Sem dados', value: '0' }]}
+                                color="indigo"
+                                icon="directions_car"
+                            />
+                            <MetricCard
+                                title="Top Marcas"
+                                items={topBrands.length ? topBrands : [{ id: '0', label: 'Sem dados', value: '0' }]}
+                                color="amber"
+                                icon="verified"
+                            />
+                        </div>
+                    )}
+                </>
             )}
         </main>
     );
