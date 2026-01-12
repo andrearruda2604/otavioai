@@ -14,7 +14,7 @@ interface Message {
     id: number;
     session_id: string;
     message: N8NMessageContent;
-    created_at?: string; // Might not exist in DB, fallback to ID order
+    created_at?: string;
 }
 
 interface ClientSession {
@@ -24,8 +24,10 @@ interface ClientSession {
     whatsapp: string;
     last_message?: string;
     fup_done?: boolean;
-    company_name?: string; // Optional if not in clients table
+    company_name?: string;
     archived?: boolean;
+    requests?: { status: string; created_at: string }[];
+    latestStatus?: string; // Derived
 }
 
 export default function ChatPage() {
@@ -36,20 +38,22 @@ export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [input, setInput] = useState('');
-    const [aiEnabled, setAiEnabled] = useState(true); // TBD: Where to store this in new schema?
+    const [aiEnabled, setAiEnabled] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Filters
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>('active');
     const [timeFilter, setTimeFilter] = useState<'all' | 'today'>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('all'); // 'all', 'Open', 'Deal', 'Canceled'
 
     // Initial Load & Debounced Search
     useEffect(() => {
         const timer = setTimeout(() => {
             fetchSessions();
-        }, 300); // Debounce search
+        }, 300);
         return () => clearTimeout(timer);
-    }, [searchTerm, filterStatus, timeFilter]);
+    }, [searchTerm, filterStatus, timeFilter, statusFilter]);
 
     useEffect(() => {
         const channel = supabase
@@ -62,7 +66,6 @@ export default function ChatPage() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
-    // Handle URL query param (chatId = subscription/whatsapp)
     useEffect(() => {
         const searchParams = new URLSearchParams(location.search);
         const urlChatId = searchParams.get('chatId');
@@ -71,14 +74,11 @@ export default function ChatPage() {
         }
     }, [location.search]);
 
-    // Load Messages when Session Selected
     useEffect(() => {
         if (!selectedSessionId) return;
 
         fetchMessages(selectedSessionId);
 
-        // Realtime subscription
-        // Note: We subscribe to global INSERTs for this table to catch the suffixed ID events
         const channel = supabase
             .channel(`n8n_chat_global`)
             .on('postgres_changes', {
@@ -87,7 +87,6 @@ export default function ChatPage() {
                 table: 'n8n_chat_histories'
             }, (payload) => {
                 const newMsg = payload.new as Message;
-                // Check if the new message belongs to the current session (exact match OR suffix match)
                 if (newMsg.session_id === selectedSessionId || newMsg.session_id === `${selectedSessionId}_orq`) {
                     setMessages(prev => [...prev, newMsg]);
                     scrollToBottom();
@@ -103,39 +102,59 @@ export default function ChatPage() {
             setLoading(true);
             let query = supabase
                 .from('clients')
-                .select('*')
+                .select(`
+                    *,
+                    requests (
+                        status,
+                        created_at
+                    )
+                `)
                 .order('last_message', { ascending: false });
 
-            // Apply Filters
-
-            // 1. Status Filter (Active vs Archived)
-            // Assuming default is active (archived is false or null)
+            // 1. Status (Active/Archived)
             if (filterStatus === 'active') {
                 query = query.or('archived.is.null,archived.eq.false');
             } else {
                 query = query.eq('archived', true);
             }
 
-            // 2. Time Filter (Today)
+            // 2. Time Filter
             if (timeFilter === 'today') {
                 const today = new Date().toISOString().split('T')[0];
                 query = query.gte('last_message', `${today}T00:00:00`);
             }
 
-            // 3. Search Filter
+            // 3. Search
             if (searchTerm.trim()) {
-                // Since Supabase doesn't support convenient "OR" across columns easily without raw SQL or specific syntax
-                // We'll search by name_first OR whatsapp
                 query = query.or(`name_first.ilike.%${searchTerm}%,name_last.ilike.%${searchTerm}%,whatsapp.ilike.%${searchTerm}%`);
             } else {
-                // Limit initial load if no search to avoid heavy payload
-                query = query.limit(20);
+                query = query.limit(50); // Increased limit slightly
             }
 
             const { data, error } = await query;
 
             if (error) throw error;
-            if (data) setSessions(data);
+
+            if (data) {
+                // Determine latest status for each client
+                let processedData = data.map((client: any) => {
+                    // Sort requests by date desc
+                    const sortedRequests = (client.requests || []).sort((a: any, b: any) =>
+                        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    );
+                    const latest = sortedRequests[0]?.status || 'Sem Status';
+                    return { ...client, latestStatus: latest };
+                });
+
+                // 4. Status Filter (Client-side)
+                if (statusFilter !== 'all') {
+                    processedData = processedData.filter(c =>
+                        c.latestStatus?.toLowerCase() === statusFilter.toLowerCase()
+                    );
+                }
+
+                setSessions(processedData);
+            }
         } catch (error) {
             console.error('Error fetching clients:', error);
         } finally {
@@ -145,14 +164,11 @@ export default function ChatPage() {
 
     const fetchMessages = async (sessionId: string) => {
         try {
-            // Fetching from n8n_chat_histories
-            // Handling mismatch: Clients have "222", N8N has "222_orq"
             const { data, error } = await supabase
                 .from('n8n_chat_histories')
                 .select('*')
-                // Use .or() to catch both clean ID and ID with suffix
                 .or(`session_id.eq.${sessionId},session_id.eq.${sessionId}_orq`)
-                .order('id', { ascending: true }); // Using ID for ordering as created_at might be missing
+                .order('id', { ascending: true });
 
             if (error) throw error;
 
@@ -176,23 +192,13 @@ export default function ChatPage() {
         const content = input;
         setInput('');
 
-        // Optimistic UI update could go here
-
         try {
-            // Insert into n8n_chat_histories
-            // Defaulting to the '_orq' suffix format for consistency with existing history
             const targetSessionId = `${selectedSessionId}_orq`;
-
-            const newMessage = {
-                type: 'human', // User sending message
-                content: content
-            };
-
+            const newMessage = { type: 'human', content: content };
             const { error } = await supabase.from('n8n_chat_histories').insert({
                 session_id: targetSessionId,
                 message: newMessage
             });
-
             if (error) throw error;
         } catch (error) {
             console.error('Error sending message:', error);
@@ -204,23 +210,27 @@ export default function ChatPage() {
         setSelectedSessionId(id);
     };
 
-    // Helper to extract display text from N8N JSON
     const getMessageContent = (msg: Message) => {
         if (!msg.message) return '';
         let text = msg.message.content || '';
-
-        // Cleanup "Used tools" logs if present (Optional)
         text = text.replace(/\[Used tools:.*?\]/g, '').trim();
-
         return text;
     };
 
     const getMessageRole = (msg: Message) => {
-        // Map N8N types to UI roles
         return msg.message?.type === 'human' ? 'user' : 'assistant';
     };
 
     const selectedClient = sessions.find(s => s.whatsapp === selectedSessionId || s.client_id.toString() === selectedSessionId);
+
+    // Helpers for Status Badge
+    const getStatusColor = (status?: string) => {
+        const s = (status || '').toLowerCase();
+        if (s.includes('deal') || s.includes('won')) return 'bg-green-100 text-green-700';
+        if (s.includes('cancel') || s.includes('lost')) return 'bg-red-100 text-red-700';
+        if (s.includes('open') || s.includes('new')) return 'bg-blue-100 text-blue-700';
+        return 'bg-slate-100 text-slate-500';
+    };
 
     return (
         <main className="flex h-[calc(100vh-theme(spacing.20))] md:h-[calc(100vh-2rem)] p-4 md:p-8 gap-6">
@@ -262,6 +272,17 @@ export default function ChatPage() {
                         >
                             {timeFilter === 'today' ? '📅 Hoje' : '📅 Todos'}
                         </button>
+
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="flex-1 text-xs font-medium py-1.5 px-2 rounded-lg border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-600 dark:text-slate-300 focus:outline-none"
+                        >
+                            <option value="all">📂 Todos Status</option>
+                            <option value="open">🔵 Open</option>
+                            <option value="deal">🟢 Deal</option>
+                            <option value="canceled">🔴 Canceled</option>
+                        </select>
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -285,7 +306,14 @@ export default function ChatPage() {
                                     {client.last_message ? new Date(client.last_message).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                 </span>
                             </div>
-                            <p className="text-xs text-primary mb-1 truncate">{client.whatsapp}</p>
+                            <div className="flex justify-between items-center mb-1">
+                                <p className="text-xs text-primary truncate">{client.whatsapp}</p>
+                                {client.latestStatus && client.latestStatus !== 'Sem Status' && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${getStatusColor(client.latestStatus)}`}>
+                                        {client.latestStatus}
+                                    </span>
+                                )}
+                            </div>
                             <div className="flex justify-between items-center">
                                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                                     {client.archived ? '📂 Arquivado' : (client.fup_done ? '✅ FUP Feito' : '⏳ Aguardando')}
@@ -314,15 +342,12 @@ export default function ChatPage() {
                             </div>
                         </div>
 
-                        {/* AI Settings (Placeholder - as toggle column isn't in clients yet) */}
-                        <div className="flex items-center gap-3 bg-slate-200 dark:bg-slate-800 p-1.5 rounded-full pl-4 pr-1.5 opacity-50 cursor-not-allowed" title="Configuração ainda não migrada para tabela Clients">
-                            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 mr-2">
-                                IA Ativada
+                        {/* Status Label in Header */}
+                        {selectedClient?.latestStatus && (
+                            <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${getStatusColor(selectedClient.latestStatus)}`}>
+                                {selectedClient.latestStatus}
                             </span>
-                            <div className="w-12 h-6 bg-primary rounded-full p-1 relative">
-                                <div className="w-4 h-4 bg-white rounded-full shadow-md transform translate-x-6"></div>
-                            </div>
-                        </div>
+                        )}
                     </header>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 dark:bg-slate-900/20">
@@ -344,7 +369,6 @@ export default function ChatPage() {
                                             : 'bg-primary text-white rounded-tr-none'
                                             }`}>
                                             <p className="text-sm">{content}</p>
-                                            {/* Timestamp omitted for now as it's not in the base table, only maybe in JSON */}
                                         </div>
                                     </div>
                                 );
@@ -359,7 +383,7 @@ export default function ChatPage() {
                                 type="text"
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Digite sua mensagem (será salva como 'human')..."
+                                placeholder="Digite sua mensagem..."
                                 className="flex-1 bg-slate-100 dark:bg-slate-900 border-0 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-900 transition-all dark:text-white"
                             />
                             <button
