@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 interface MetricItem {
@@ -40,6 +41,7 @@ const MetricCard: React.FC<{ title: string; items: MetricItem[]; color: string; 
 );
 
 export default function InsightsPage() {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'missed' | 'success'>('success');
     const [loading, setLoading] = useState(true);
 
@@ -135,7 +137,7 @@ export default function InsightsPage() {
 
     const handleViewConversation = (clientId: string) => {
         if (clientId) {
-            window.location.href = `/chat?chatId=${clientId}`;
+            navigate(`/chat?chatId=${clientId}`);
         }
     };
 
