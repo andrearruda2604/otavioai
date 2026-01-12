@@ -67,16 +67,21 @@ export default function ChatPage() {
 
         fetchMessages(selectedSessionId);
 
+        // Realtime subscription
+        // Note: We subscribe to global INSERTs for this table to catch the suffixed ID events
         const channel = supabase
-            .channel(`n8n_chat:${selectedSessionId}`)
+            .channel(`n8n_chat_global`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
-                table: 'n8n_chat_histories',
-                filter: `session_id=eq.${selectedSessionId}`
+                table: 'n8n_chat_histories'
             }, (payload) => {
-                setMessages(prev => [...prev, payload.new as Message]);
-                scrollToBottom();
+                const newMsg = payload.new as Message;
+                // Check if the new message belongs to the current session (exact match OR suffix match)
+                if (newMsg.session_id === selectedSessionId || newMsg.session_id === `${selectedSessionId}_orq`) {
+                    setMessages(prev => [...prev, newMsg]);
+                    scrollToBottom();
+                }
             })
             .subscribe();
 
@@ -103,11 +108,12 @@ export default function ChatPage() {
     const fetchMessages = async (sessionId: string) => {
         try {
             // Fetching from n8n_chat_histories
-            // Assuming session_id in n8n_chat_histories matches clients.whatsapp
+            // Handling mismatch: Clients have "222", N8N has "222_orq"
             const { data, error } = await supabase
                 .from('n8n_chat_histories')
                 .select('*')
-                .eq('session_id', sessionId)
+                // Use .or() to catch both clean ID and ID with suffix
+                .or(`session_id.eq.${sessionId},session_id.eq.${sessionId}_orq`)
                 .order('id', { ascending: true }); // Using ID for ordering as created_at might be missing
 
             if (error) throw error;
@@ -136,13 +142,16 @@ export default function ChatPage() {
 
         try {
             // Insert into n8n_chat_histories
+            // Defaulting to the '_orq' suffix format for consistency with existing history
+            const targetSessionId = `${selectedSessionId}_orq`;
+
             const newMessage = {
                 type: 'human', // User sending message
                 content: content
             };
 
             const { error } = await supabase.from('n8n_chat_histories').insert({
-                session_id: selectedSessionId,
+                session_id: targetSessionId,
                 message: newMessage
             });
 
@@ -254,8 +263,8 @@ export default function ChatPage() {
                                 return (
                                     <div key={msg.id} className={`flex ${role === 'user' ? 'justify-start' : 'justify-end'}`}>
                                         <div className={`max-w-[85%] md:max-w-[75%] p-3 rounded-2xl shadow-sm whitespace-pre-wrap ${role === 'user'
-                                                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'
-                                                : 'bg-primary text-white rounded-tr-none'
+                                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'
+                                            : 'bg-primary text-white rounded-tr-none'
                                             }`}>
                                             <p className="text-sm">{content}</p>
                                             {/* Timestamp omitted for now as it's not in the base table, only maybe in JSON */}
