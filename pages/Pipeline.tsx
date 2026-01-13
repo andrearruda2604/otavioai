@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { KanbanCardData } from '../types';
+import { PipelineDetailsSidebar, PipelineRequest } from '../components/PipelineDetailsSidebar';
 
 // --- Types & Components ---
 
@@ -32,20 +32,11 @@ interface KanbanColumnProps {
     count: number;
     color: string;
     cards: KanbanCardData[];
+    onCardClick: (card: KanbanCardData) => void;
     onArchive?: (card: KanbanCardData) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards, onArchive }) => {
-    const navigate = useNavigate();
-
-    const handleCardClick = (card: KanbanCardData) => {
-        if (card.chatId) {
-            navigate(`/chat?chatId=${card.chatId}`);
-        } else {
-            navigate('/chat');
-        }
-    };
-
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards, onCardClick, onArchive }) => {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between mb-2">
@@ -62,7 +53,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards,
                     cards.map((card, i) => (
                         <div
                             key={i}
-                            onClick={() => handleCardClick(card)}
+                            onClick={() => onCardClick(card)}
                             className="bg-white dark:bg-card-dark p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 hover:shadow-md transition-shadow relative overflow-hidden group cursor-pointer active:scale-[0.98] transform duration-200"
                         >
                             <div className={`absolute left-0 top-0 bottom-0 w-1 bg-${color}-500 opacity-0 group-hover:opacity-100 transition-opacity`}></div>
@@ -120,6 +111,10 @@ export default function PipelinePage() {
     });
     const [loading, setLoading] = useState(true);
 
+    // Store raw request data for detail view
+    const [rawRequests, setRawRequests] = useState<any[]>([]);
+    const [selectedRequest, setSelectedRequest] = useState<PipelineRequest | null>(null);
+
     useEffect(() => {
         fetchPipelineData();
 
@@ -150,7 +145,8 @@ export default function PipelinePage() {
                         client_id,
                         name_first,
                         name_last,
-                        whatsapp
+                        whatsapp,
+                        company
                     )
                 `)
                 .order('created_at', { ascending: false });
@@ -203,6 +199,9 @@ export default function PipelinePage() {
                 });
             }
 
+            // Store raw data for detail view
+            setRawRequests(filteredData);
+
             // Map data to columns
             const newColumns: { [key: string]: KanbanCardData[] } = {
                 'Not Found': [],
@@ -252,6 +251,74 @@ export default function PipelinePage() {
             console.error('Error fetching pipeline:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCardClick = (card: KanbanCardData) => {
+        // Find the full raw request data
+        const rawReq = rawRequests.find((r: any) => r.request_id.toString() === card.id);
+        if (rawReq) {
+            const mappedRequest: PipelineRequest = {
+                request_id: rawReq.request_id,
+                title: card.title,
+                status: rawReq.status || '',
+                created_at: rawReq.created_at,
+                total_price: rawReq.total_price,
+                ordered_prods: rawReq.ordered_prods,
+                client: rawReq.clients ? {
+                    client_id: rawReq.clients.client_id,
+                    name_first: rawReq.clients.name_first,
+                    name_last: rawReq.clients.name_last,
+                    whatsapp: rawReq.clients.whatsapp,
+                    company: rawReq.clients.company
+                } : undefined,
+                verified: !!rawReq.total_price
+            };
+            setSelectedRequest(mappedRequest);
+        }
+    };
+
+    const handleCloseSidebar = () => {
+        setSelectedRequest(null);
+    };
+
+    const handleVerify = async (requestId: number) => {
+        // Implement verification logic: update total_price or a dedicated 'verified' field
+        // For now, we'll just toggle visual state by updating total_price to a default value
+        try {
+            const req = rawRequests.find((r: any) => r.request_id === requestId);
+            const newPrice = req?.total_price ? null : 1; // Toggle: if has price, remove; if no price, set to 1 (dummy)
+
+            await supabase
+                .from('requests')
+                .update({ total_price: newPrice })
+                .eq('request_id', requestId);
+
+            fetchPipelineData();
+            setSelectedRequest(null);
+        } catch (error) {
+            console.error('Error verifying request:', error);
+        }
+    };
+
+    const handleArchive = async (requestId: number) => {
+        const req = rawRequests.find((r: any) => r.request_id === requestId);
+        if (!req?.clients?.client_id) return;
+
+        const confirm = window.confirm(`Deseja arquivar esta solicitação?`);
+        if (!confirm) return;
+
+        try {
+            await supabase
+                .from('requests')
+                .update({ archived: true })
+                .eq('request_id', requestId);
+
+            fetchPipelineData();
+            setSelectedRequest(null);
+        } catch (error) {
+            console.error('Error archiving request:', error);
+            alert('Erro ao arquivar.');
         }
     };
 
@@ -354,12 +421,21 @@ export default function PipelinePage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onArchive={handleBulkArchive} />
-                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onArchive={handleBulkArchive} />
-                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onArchive={handleBulkArchive} />
-                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
                 </div>
             )}
+
+            {/* Sidebar */}
+            <PipelineDetailsSidebar
+                request={selectedRequest}
+                isOpen={!!selectedRequest}
+                onClose={handleCloseSidebar}
+                onVerify={handleVerify}
+                onArchive={handleArchive}
+            />
         </main>
     );
 }
