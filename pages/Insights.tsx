@@ -36,22 +36,30 @@ const COLORS = {
 const FilterButton = ({
     active,
     onClick,
-    label
+    label,
+    variant = 'default'
 }: {
     active: boolean;
     onClick: () => void;
     label: string;
-}) => (
-    <button
-        onClick={onClick}
-        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${active
-            ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-            }`}
-    >
-        {label}
-    </button>
-);
+    variant?: 'default' | 'status'
+}) => {
+    // Styling based on variant
+    const baseClass = "px-4 py-1.5 rounded-lg text-sm font-medium transition-all";
+    const activeClass = variant === 'status'
+        ? 'bg-emerald-500 text-white shadow-sm'
+        : 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm';
+    const inactiveClass = "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800";
+
+    return (
+        <button
+            onClick={onClick}
+            className={`${baseClass} ${active ? activeClass : inactiveClass}`}
+        >
+            {label}
+        </button>
+    );
+};
 
 const ChartCard = ({
     title,
@@ -76,7 +84,9 @@ const ChartCard = ({
 // --- Main Component ---
 
 export default function InsightsPage() {
-    const [dateRange, setDateRange] = useState<DateRangeOption>('7days');
+    // Default to 'total' if data is scarce, or '30days' as a balanced default.
+    // User reported "empty charts", likely purely due to date range on test data.
+    const [dateRange, setDateRange] = useState<DateRangeOption>('total');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [loading, setLoading] = useState(true);
     const [rawData, setRawData] = useState<any[]>([]);
@@ -85,21 +95,22 @@ export default function InsightsPage() {
 
     useEffect(() => {
         fetchData();
-    }, [dateRange]); // Refetch when date range changes (optimization: could suggest fetching all and filtering client side if data is small, but server filter is safer for scaling)
+    }, [dateRange]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
+            // Use left join (requests instead of requests!inner) to see all products first,
+            // then filter. This helps debug if data exists but status is missing.
             let query = supabase
                 .from('requests_products')
                 .select(`
-                    id,
                     created_at,
                     prod_title,
                     car_brand,
                     car_model,
                     car_year,
-                    requests!inner (
+                    requests (
                         status
                     )
                 `);
@@ -133,6 +144,7 @@ export default function InsightsPage() {
             const { data, error } = await query;
 
             if (error) throw error;
+            console.log('Fetched Data:', data?.length); // Debugging
             setRawData(data || []);
 
         } catch (error) {
@@ -145,9 +157,10 @@ export default function InsightsPage() {
     // --- Data Processing ---
 
     const processedData = useMemo(() => {
-        // 1. Apply Status Filter Client-Side (since we need joined data status)
+        // 1. Apply Status Filter Client-Side 
         const filtered = rawData.filter(item => {
             const status = item.requests?.status?.toLowerCase() || '';
+            // Define logic: Found = NOT (cancelled or not found). Everything else is found.
             const isMissed = status.includes('cancel') || status.includes('not found') || status.includes('não encontrado');
             const isFound = !isMissed;
 
@@ -199,19 +212,31 @@ export default function InsightsPage() {
     return (
         <main className="p-6 lg:p-10 max-w-[1600px] mx-auto space-y-8">
             {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                <div>
-                    <h1 className="text-3xl font-bold dark:text-white">Insights</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Análise detalhada por marca, modelo e ano</p>
-                </div>
+            <div className="flex flex-col gap-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div>
+                        <h1 className="text-3xl font-bold dark:text-white">Insights</h1>
+                        <p className="text-slate-500 dark:text-slate-400">Análise detalhada por marca, modelo e ano</p>
+                    </div>
 
-                <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-card-dark p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <span className="material-icons-round text-slate-400 ml-2 mr-2">calendar_today</span>
-                    <FilterButton active={dateRange === 'today'} onClick={() => setDateRange('today')} label="Hoje" />
-                    <FilterButton active={dateRange === '7days'} onClick={() => setDateRange('7days')} label="7 dias" />
-                    <FilterButton active={dateRange === '30days'} onClick={() => setDateRange('30days')} label="30 dias" />
-                    <FilterButton active={dateRange === 'month'} onClick={() => setDateRange('month')} label="Mês atual" />
-                    <FilterButton active={dateRange === 'total'} onClick={() => setDateRange('total')} label="Total" />
+                    <div className="flex flex-col lg:items-end gap-3">
+                        {/* Date Filters */}
+                        <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-card-dark p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto">
+                            <span className="material-icons-round text-slate-400 ml-2 mr-2">calendar_today</span>
+                            <FilterButton active={dateRange === 'today'} onClick={() => setDateRange('today')} label="Hoje" />
+                            <FilterButton active={dateRange === '7days'} onClick={() => setDateRange('7days')} label="7 dias" />
+                            <FilterButton active={dateRange === '30days'} onClick={() => setDateRange('30days')} label="30 dias" />
+                            <FilterButton active={dateRange === 'month'} onClick={() => setDateRange('month')} label="Mês atual" />
+                            <FilterButton active={dateRange === 'total'} onClick={() => setDateRange('total')} label="Total" />
+                        </div>
+
+                        {/* Status Filters - Moved below date filters as requested */}
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-xl self-start lg:self-end">
+                            <FilterButton variant='status' active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} label="Todos" />
+                            <FilterButton variant='status' active={statusFilter === 'found'} onClick={() => setStatusFilter('found')} label="Encontrados" />
+                            <FilterButton variant='status' active={statusFilter === 'missed'} onClick={() => setStatusFilter('missed')} label="Não encontrados" />
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -224,25 +249,7 @@ export default function InsightsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                     {/* 1. Principais Produtos */}
-                    <ChartCard
-                        title="Principais Produtos"
-                        headerAction={
-                            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-                                <button
-                                    onClick={() => setStatusFilter('all')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === 'all' ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                                >Todos</button>
-                                <button
-                                    onClick={() => setStatusFilter('found')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === 'found' ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                                >Encontrados</button>
-                                <button
-                                    onClick={() => setStatusFilter('missed')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === 'missed' ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                                >Não encontrados</button>
-                            </div>
-                        }
-                    >
+                    <ChartCard title="Principais Produtos">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart layout="vertical" data={processedData.products} margin={{ left: 40, right: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
