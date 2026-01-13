@@ -91,7 +91,7 @@ export default function KnowledgePage() {
                 user_id: user?.id,
                 ...urls,
                 updated_at: new Date().toISOString()
-            });
+            }, { onConflict: 'user_id' });
 
             if (error) throw error;
             setMessage('URLs salvas com sucesso!');
