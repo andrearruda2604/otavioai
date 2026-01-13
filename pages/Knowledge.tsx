@@ -149,8 +149,14 @@ export default function KnowledgePage() {
             setFiles(prev => [...prev, newFile]);
 
             try {
+                // Sanitize filename: remove accents, replace spaces with underscores
+                const sanitizedName = file.name
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+                    .replace(/[^a-zA-Z0-9.-]/g, '_'); // Replace special chars with underscore
+
                 // Upload to Supabase Storage
-                const filePath = `${user?.id}/${Date.now()}-${file.name}`;
+                const filePath = `${user?.id}/${Date.now()}-${sanitizedName}`;
                 const { data: storageData, error: storageError } = await supabase.storage
                     .from('knowledge-files')
                     .upload(filePath, file);
