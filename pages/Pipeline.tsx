@@ -145,8 +145,7 @@ export default function PipelinePage() {
                         client_id,
                         name_first,
                         name_last,
-                        whatsapp,
-                        company
+                        whatsapp
                     )
                 `)
                 .order('created_at', { ascending: false });
