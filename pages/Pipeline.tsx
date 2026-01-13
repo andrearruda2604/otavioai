@@ -3,6 +3,30 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { KanbanCardData } from '../types';
 
+// --- Types & Components ---
+
+type DateRangeOption = 'today' | '7days' | '30days' | 'month' | 'total';
+
+const FilterButton = ({
+    active,
+    onClick,
+    label
+}: {
+    active: boolean;
+    onClick: () => void;
+    label: string;
+}) => (
+    <button
+        onClick={onClick}
+        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${active
+            ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+    >
+        {label}
+    </button>
+);
+
 interface KanbanColumnProps {
     title: string;
     count: number;
@@ -87,6 +111,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards,
 export default function PipelinePage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showArchived, setShowArchived] = useState(false);
+    const [dateRange, setDateRange] = useState<DateRangeOption>('total');
     const [columns, setColumns] = useState<{ [key: string]: KanbanCardData[] }>({
         'Not Found': [],
         'Pending Feedback': [],
@@ -107,7 +132,7 @@ export default function PipelinePage() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [searchTerm, showArchived]);
+    }, [searchTerm, showArchived, dateRange]);
 
     const fetchPipelineData = async () => {
         try {
@@ -130,11 +155,36 @@ export default function PipelinePage() {
                 `)
                 .order('created_at', { ascending: false });
 
-            // Filter Archived
+            // 1. Filter Archived
             if (!showArchived) {
                 query = query.or('archived.is.null,archived.eq.false');
             } else {
                 query = query.eq('archived', true);
+            }
+
+            // 2. Filter Date Range
+            const now = new Date();
+            let startDate = new Date();
+            switch (dateRange) {
+                case 'today':
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+                case '7days':
+                    startDate.setDate(now.getDate() - 7);
+                    break;
+                case '30days':
+                    startDate.setDate(now.getDate() - 30);
+                    break;
+                case 'month':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'total':
+                    startDate = new Date(0);
+                    break;
+            }
+
+            if (dateRange !== 'total') {
+                query = query.gte('created_at', startDate.toISOString());
             }
 
             const { data, error } = await query;
@@ -143,6 +193,7 @@ export default function PipelinePage() {
 
             let filteredData = data || [];
 
+            // 3. Filter Search Term (Client-side)
             if (searchTerm.trim()) {
                 const lower = searchTerm.toLowerCase();
                 filteredData = filteredData.filter((req: any) => {
@@ -244,36 +295,54 @@ export default function PipelinePage() {
 
     return (
         <main className="p-8">
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-                <div>
-                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white">Pipeline</h2>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Gerencie o follow-up de solicitações</p>
+            <header className="flex flex-col gap-6 mb-8">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold text-slate-800 dark:text-white">Pipeline</h2>
+                        <p className="text-slate-500 dark:text-slate-400 mt-1">Gerencie o follow-up de solicitações</p>
+                    </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex gap-1 bg-white dark:bg-card-dark p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <button
-                            onClick={() => setShowArchived(false)}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${!showArchived ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
-                        >
-                            Ativos
-                        </button>
-                        <button
-                            onClick={() => setShowArchived(true)}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${showArchived ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
-                        >
-                            Arquivados
-                        </button>
+
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-card-dark p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    {/* Date Filters */}
+                    <div className="flex flex-wrap items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+                        <span className="material-icons-round text-slate-400 ml-2 mr-2">calendar_today</span>
+                        <FilterButton active={dateRange === 'today'} onClick={() => setDateRange('today')} label="Hoje" />
+                        <FilterButton active={dateRange === '7days'} onClick={() => setDateRange('7days')} label="7 dias" />
+                        <FilterButton active={dateRange === '30days'} onClick={() => setDateRange('30days')} label="30 dias" />
+                        <FilterButton active={dateRange === 'month'} onClick={() => setDateRange('month')} label="Mês atual" />
+                        <FilterButton active={dateRange === 'total'} onClick={() => setDateRange('total')} label="Total" />
                     </div>
 
-                    <div className="relative group">
-                        <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                        <input
-                            className="pl-10 pr-4 py-2.5 bg-white dark:bg-card-dark border-none rounded-xl text-sm w-72 shadow-sm focus:ring-2 focus:ring-primary transition-all dark:text-white"
-                            placeholder="Buscar cliente ou produto..."
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
+
+                    {/* Existing Filters: Archived & Search */}
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                            <button
+                                onClick={() => setShowArchived(false)}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${!showArchived ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                            >
+                                Ativos
+                            </button>
+                            <button
+                                onClick={() => setShowArchived(true)}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${showArchived ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                            >
+                                Arquivados
+                            </button>
+                        </div>
+
+                        <div className="relative group">
+                            <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+                            <input
+                                className="pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-sm w-48 focus:ring-2 focus:ring-primary transition-all dark:text-white"
+                                placeholder="Buscar..."
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
             </header>
