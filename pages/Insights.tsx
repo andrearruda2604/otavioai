@@ -263,7 +263,7 @@ export default function InsightsPage() {
                                 <Tooltip content={<CustomTooltip />} />
                                 <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
                                     {processedData.products.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill="#1e293b" />
+                                        <Cell key={`cell-${index}`} fill={COLORS.purple} />
                                     ))}
                                 </Bar>
                             </BarChart>
