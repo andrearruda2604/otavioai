@@ -1,264 +1,323 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    Cell
+} from 'recharts';
 
-interface MetricItem {
-    id: string;
-    label: string;
-    value: number | string;
-    trend?: string;
-    isUp?: boolean;
+// --- Types ---
+
+type DateRangeOption = 'today' | '7days' | '30days' | 'month' | 'total';
+type StatusFilter = 'all' | 'found' | 'missed';
+
+interface ChartData {
+    name: string;
+    value: number;
 }
 
-const MetricCard: React.FC<{ title: string; items: MetricItem[]; color: string; icon: string }> = ({ title, items, color, icon }) => (
-    <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div className="flex items-center gap-3 mb-6">
-            <div className={`w-10 h-10 rounded-xl bg-${color}-50 dark:bg-${color}-900/20 flex items-center justify-center text-${color}-600 dark:text-${color}-400`}>
-                <span className="material-icons-round">{icon}</span>
-            </div>
-            <h3 className="font-semibold text-lg dark:text-white">{title}</h3>
+// --- Constants ---
+
+const COLORS = {
+    primary: '#10B981', // Emerald 500
+    secondary: '#3B82F6', // Blue 500
+    tertiary: '#F59E0B', // Amber 500
+    dark: '#1E293B', // Slate 800
+    purple: '#8B5CF6' // Violet 500
+};
+
+// --- Helper Components ---
+
+const FilterButton = ({
+    active,
+    onClick,
+    label
+}: {
+    active: boolean;
+    onClick: () => void;
+    label: string;
+}) => (
+    <button
+        onClick={onClick}
+        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${active
+            ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+    >
+        {label}
+    </button>
+);
+
+const ChartCard = ({
+    title,
+    children,
+    headerAction
+}: {
+    title: string;
+    children: React.ReactNode;
+    headerAction?: React.ReactNode;
+}) => (
+    <div className="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col h-[400px]">
+        <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-lg text-slate-800 dark:text-white">{title}</h3>
+            {headerAction}
         </div>
-        <div className="space-y-4">
-            {items.map((item, idx) => (
-                <div key={idx} className="flex items-center gap-4 group">
-                    <span className="font-bold text-slate-400 w-4">{idx + 1}</span>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex justify-between mb-1">
-                            <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{item.label}</span>
-                            <span className="text-sm font-semibold text-slate-900 dark:text-white">{item.value}</span>
-                        </div>
-                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
-                            <div
-                                className={`bg-${color}-500 rounded-full h-1.5 transition-all duration-500`}
-                                style={{ width: `${Math.max(10, 100 - (idx * 20))}%` }}
-                            ></div>
-                        </div>
-                    </div>
-                </div>
-            ))}
+        <div className="flex-1 w-full min-h-0">
+            {children}
         </div>
     </div>
 );
 
-export default function InsightsPage() {
-    const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<'missed' | 'success'>('success');
-    const [loading, setLoading] = useState(true);
+// --- Main Component ---
 
-    // Metrics State
-    const [topProducts, setTopProducts] = useState<MetricItem[]>([]);
-    const [topVehicles, setTopVehicles] = useState<MetricItem[]>([]);
-    const [topBrands, setTopBrands] = useState<MetricItem[]>([]);
-    const [missedSales, setMissedSales] = useState<any[]>([]);
+export default function InsightsPage() {
+    const [dateRange, setDateRange] = useState<DateRangeOption>('7days');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+    const [loading, setLoading] = useState(true);
+    const [rawData, setRawData] = useState<any[]>([]);
+
+    // --- Data Fetching ---
 
     useEffect(() => {
-        fetchAnalytics();
-    }, []);
+        fetchData();
+    }, [dateRange]); // Refetch when date range changes (optimization: could suggest fetching all and filtering client side if data is small, but server filter is safer for scaling)
 
-    const fetchAnalytics = async () => {
+    const fetchData = async () => {
+        setLoading(true);
         try {
-            setLoading(true);
-
-            // 1. Fetch Request Products for "Top" metrics
-            const { data: productsData, error: prodError } = await supabase
+            let query = supabase
                 .from('requests_products')
-                .select('prod_title, car_model, car_brand')
-                .limit(1000); // Analyze sample of last 1000 items
+                .select(`
+                    id,
+                    created_at,
+                    prod_title,
+                    car_brand,
+                    car_model,
+                    car_year,
+                    requests!inner (
+                        status
+                    )
+                `);
 
-            if (prodError) throw prodError;
+            // Apply Date Filter
+            const now = new Date();
+            let startDate = new Date();
 
-            if (productsData) {
-                // Aggregation Helpers
-                const aggregate = (key: keyof typeof productsData[0]) => {
-                    const counts: Record<string, number> = {};
-                    productsData.forEach(p => {
-                        const val = p[key];
-                        if (val) counts[String(val)] = (counts[String(val)] || 0) + 1;
-                    });
-                    return Object.entries(counts)
-                        .sort(([, a], [, b]) => b - a)
-                        .slice(0, 4)
-                        .map(([label, count], i) => ({
-                            id: i.toString(),
-                            label,
-                            value: `${count} und`
-                        }));
-                };
-
-                setTopProducts(aggregate('prod_title'));
-                setTopVehicles(aggregate('car_model'));
-                setTopBrands(aggregate('car_brand'));
+            switch (dateRange) {
+                case 'today':
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+                case '7days':
+                    startDate.setDate(now.getDate() - 7);
+                    break;
+                case '30days':
+                    startDate.setDate(now.getDate() - 30);
+                    break;
+                case 'month':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    break;
+                case 'total':
+                    startDate = new Date(0); // Beginning of time
+                    break;
             }
 
-            // 2. Fetch Missed Sales (Status != Deal) using requests_products joined with requests
-            // Filter where PARENT request status is 'Cancelled' or 'Not Found'
-            const { data: productsDataMissed, error: reqError } = await supabase
-                .from('requests_products')
-                .select('prod_title, car_brand, car_model, car_year, created_at, requests!inner(status, client_id)')
-                .or('status.ilike.%cancel%,status.ilike.%not found%', { foreignTable: 'requests' }) // Filter on joined table
-                .order('created_at', { ascending: false })
-                .limit(20);
-
-            if (reqError) throw reqError;
-
-            if (productsDataMissed) {
-                const mappedMissed = productsDataMissed.map((p: any, i: number) => {
-                    const parts = [
-                        p.prod_title,
-                        p.car_brand,
-                        p.car_model,
-                        p.car_year
-                    ].filter(Boolean); // Remove null/undefined/empty strings
-
-                    return {
-                        id: i.toString(),
-                        product_name: parts.join(' / ') || "Peça não identificada",
-                        frequency: 1,
-                        related_vehicle: 'N/A',
-                        last_requested: new Date(p.created_at).toLocaleDateString(),
-                        client_id: p.requests?.client_id // Capture client_id for linking
-                    };
-                });
-                setMissedSales(mappedMissed);
+            if (dateRange !== 'total') {
+                query = query.gte('created_at', startDate.toISOString());
             }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            setRawData(data || []);
 
         } catch (error) {
-            console.error('Error fetching analytics:', error);
+            console.error('Error fetching insights:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleGoogleSearch = (productName: string) => {
-        // Search using the full concatenated string for better context
-        const url = `https://www.google.com/shopping?hl=pt-BR&q=${encodeURIComponent(productName)}`;
-        window.open(url, '_blank');
-    };
+    // --- Data Processing ---
 
-    const handleViewConversation = (clientId: string) => {
-        if (clientId) {
-            navigate(`/chat?chatId=${clientId}`);
+    const processedData = useMemo(() => {
+        // 1. Apply Status Filter Client-Side (since we need joined data status)
+        const filtered = rawData.filter(item => {
+            const status = item.requests?.status?.toLowerCase() || '';
+            const isMissed = status.includes('cancel') || status.includes('not found') || status.includes('não encontrado');
+            const isFound = !isMissed;
+
+            if (statusFilter === 'found') return isFound;
+            if (statusFilter === 'missed') return isMissed;
+            return true; // 'all'
+        });
+
+        // 2. Aggregate Data for Charts
+        const aggregate = (key: string, limit = 5): ChartData[] => {
+            const counts: Record<string, number> = {};
+            filtered.forEach(item => {
+                const val = item[key];
+                if (val) {
+                    // Normalize
+                    const label = String(val).trim();
+                    counts[label] = (counts[label] || 0) + 1;
+                }
+            });
+
+            return Object.entries(counts)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, limit);
+        };
+
+        return {
+            products: aggregate('prod_title'),
+            brands: aggregate('car_brand'),
+            models: aggregate('car_model'),
+            years: aggregate('car_year').sort((a, b) => Number(a.name) - Number(b.name)) // Years usually sorted chronologically
+        };
+    }, [rawData, statusFilter]);
+
+    // --- Render ---
+
+    const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-slate-800 text-white text-xs p-2 rounded shadow-lg">
+                    <p className="font-semibold">{label}</p>
+                    <p>{`Qtd: ${payload[0].value}`}</p>
+                </div>
+            );
         }
+        return null;
     };
 
     return (
-        <main className="p-6 lg:p-10 max-w-[1600px] mx-auto">
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+        <main className="p-6 lg:p-10 max-w-[1600px] mx-auto space-y-8">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-bold dark:text-white">Insights & Analytics</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Inteligência de mercado baseada nas interações reais</p>
+                    <h1 className="text-3xl font-bold dark:text-white">Insights</h1>
+                    <p className="text-slate-500 dark:text-slate-400">Análise detalhada por marca, modelo e ano</p>
                 </div>
 
-                <div className="flex bg-white dark:bg-card-dark p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-                    <button
-                        onClick={() => setActiveTab('success')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'success'
-                            ? 'bg-emerald-500 text-white shadow-md'
-                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                            }`}
-                    >
-                        Performance e Sucesso
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('missed')}
-                        className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'missed'
-                            ? 'bg-primary text-white shadow-md'
-                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                            }`}
-                    >
-                        Demanda Não Atendida
-                    </button>
+                <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-card-dark p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <span className="material-icons-round text-slate-400 ml-2 mr-2">calendar_today</span>
+                    <FilterButton active={dateRange === 'today'} onClick={() => setDateRange('today')} label="Hoje" />
+                    <FilterButton active={dateRange === '7days'} onClick={() => setDateRange('7days')} label="7 dias" />
+                    <FilterButton active={dateRange === '30days'} onClick={() => setDateRange('30days')} label="30 dias" />
+                    <FilterButton active={dateRange === 'month'} onClick={() => setDateRange('month')} label="Mês atual" />
+                    <FilterButton active={dateRange === 'total'} onClick={() => setDateRange('total')} label="Total" />
                 </div>
-            </header>
+            </div>
 
+            {/* Content */}
             {loading ? (
-                <div className="flex items-center justify-center h-64 text-slate-400">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mr-2"></div>
-                    Carregando Dados...
+                <div className="flex items-center justify-center h-96">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : (
-                <>
-                    {activeTab === 'missed' ? (
-                        <div className="animate-fade-in space-y-6">
-                            <div className="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                                    <h3 className="font-semibold text-lg dark:text-white">Oportunidades Perdidas (Status: Cancelado/Não Encontrado)</h3>
-                                    <span className="text-xs font-medium px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-md">Últimos 20 itens</span>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
-                                            <tr>
-                                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Peça / Veículo</th>
-                                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-40">Data</th>
-                                                <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider w-48">Ação</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                            {missedSales.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={3} className="px-6 py-8 text-center text-slate-500 italic">Nenhum dado encontrado para este período.</td>
-                                                </tr>
-                                            ) : (
-                                                missedSales.map((sale) => (
-                                                    <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                        <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">
-                                                            <div className="flex flex-col">
-                                                                <span>{sale.product_name}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">{sale.last_requested}</td>
-                                                        <td className="px-6 py-4 text-sm text-right whitespace-nowrap">
-                                                            <div className="flex items-center justify-end gap-3">
-                                                                <button
-                                                                    onClick={() => handleViewConversation(sale.client_id)}
-                                                                    className="text-slate-500 hover:text-primary font-medium text-sm flex items-center gap-1 transition-colors"
-                                                                    title="Ver conversa original"
-                                                                >
-                                                                    <span className="material-icons-round text-sm" style={{ fontSize: '18px' }}>chat</span>
-                                                                    Conversa
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleGoogleSearch(sale.product_name)}
-                                                                    className="text-primary hover:text-primary-dark font-medium text-sm hover:underline inline-flex items-center gap-1 transition-colors"
-                                                                    title={`Consultar "${sale.product_name}" no Google Shopping`}
-                                                                >
-                                                                    Consultar
-                                                                    <span className="material-icons-round text-sm" style={{ fontSize: '16px' }}>open_in_new</span>
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* 1. Principais Produtos */}
+                    <ChartCard
+                        title="Principais Produtos"
+                        headerAction={
+                            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                                <button
+                                    onClick={() => setStatusFilter('all')}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === 'all' ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                                >Todos</button>
+                                <button
+                                    onClick={() => setStatusFilter('found')}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === 'found' ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                                >Encontrados</button>
+                                <button
+                                    onClick={() => setStatusFilter('missed')}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${statusFilter === 'missed' ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                                >Não encontrados</button>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="animate-fade-in grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <MetricCard
-                                title="Produtos Mais Solicitados"
-                                items={topProducts.length ? topProducts : [{ id: '0', label: 'Sem dados', value: '0' }]}
-                                color="emerald"
-                                icon="shopping_bag"
-                            />
-                            <MetricCard
-                                title="Veículos Populares"
-                                items={topVehicles.length ? topVehicles : [{ id: '0', label: 'Sem dados', value: '0' }]}
-                                color="indigo"
-                                icon="directions_car"
-                            />
-                            <MetricCard
-                                title="Top Marcas"
-                                items={topBrands.length ? topBrands : [{ id: '0', label: 'Sem dados', value: '0' }]}
-                                color="amber"
-                                icon="verified"
-                            />
-                        </div>
-                    )}
-                </>
+                        }
+                    >
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart layout="vertical" data={processedData.products} margin={{ left: 40, right: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    width={100}
+                                    tick={{ fontSize: 12, fill: '#64748b' }}
+                                />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                                    {processedData.products.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill="#1e293b" />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+
+                    {/* 2. Por Marca */}
+                    <ChartCard title="Por Marca">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart layout="vertical" data={processedData.brands} margin={{ left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    width={80}
+                                    tick={{ fontSize: 12, fill: '#64748b' }}
+                                />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Bar dataKey="value" fill={COLORS.primary} radius={[0, 4, 4, 0]} barSize={24} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+
+                    {/* 3. Por Modelo */}
+                    <ChartCard title="Por Modelo">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart layout="vertical" data={processedData.models} margin={{ left: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                                <XAxis type="number" hide />
+                                <YAxis
+                                    dataKey="name"
+                                    type="category"
+                                    width={80}
+                                    tick={{ fontSize: 12, fill: '#64748b' }}
+                                />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Bar dataKey="value" fill={COLORS.secondary} radius={[0, 4, 4, 0]} barSize={24} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+
+                    {/* 4. Por Ano */}
+                    <ChartCard title="Por Ano">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={processedData.years} margin={{ top: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 12, fill: '#64748b' }}
+                                />
+                                <YAxis hide />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Bar dataKey="value" fill={COLORS.tertiary} radius={[4, 4, 0, 0]} barSize={40} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartCard>
+
+                </div>
             )}
         </main>
     );
