@@ -41,7 +41,7 @@ export default function DashboardPage() {
     const [chartData, setChartData] = useState<any[]>([]);
     const [interactions, setInteractions] = useState<any[]>([]);
     const [brandStats, setBrandStats] = useState<any[]>([]);
-    const [timeRange, setTimeRange] = useState<'today' | '7days' | 'month'>('month');
+    const [timeRange, setTimeRange] = useState<'today' | '7days' | '30days' | 'currentMonth' | 'total'>('30days');
 
     useEffect(() => {
         fetchDashboardData();
@@ -63,7 +63,7 @@ export default function DashboardPage() {
 
             // Calculate date range based on timeRange
             const now = new Date();
-            let startDate = new Date();
+            let startDate: Date | null = new Date();
 
             switch (timeRange) {
                 case 'today':
@@ -72,14 +72,21 @@ export default function DashboardPage() {
                 case '7days':
                     startDate.setDate(now.getDate() - 7);
                     break;
-                case 'month':
+                case '30days':
                     startDate.setDate(now.getDate() - 30);
+                    break;
+                case 'currentMonth':
+                    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+                case 'total':
+                    startDate = null; // No filter for total
                     break;
             }
 
             // 1. Fetch Requests & Calc KPIs
             // Get data for chart and KPIs filtered by date range
-            const { data: requests, error } = await supabase
+            let query = supabase
                 .from('requests')
                 .select(`
                     created_at,
@@ -88,9 +95,14 @@ export default function DashboardPage() {
                     ordered_prods,
                     client_id,
                     clients (name_first, name_last, whatsapp, company_name)
-                `)
-                .gte('created_at', startDate.toISOString())
-                .order('created_at', { ascending: false });
+                `);
+
+            // Apply date filter only if startDate is not null (i.e., not 'total')
+            if (startDate !== null) {
+                query = query.gte('created_at', startDate.toISOString());
+            }
+
+            const { data: requests, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
 
@@ -122,7 +134,12 @@ export default function DashboardPage() {
                 const now = new Date();
 
                 // Determine number of days to show based on timeRange
-                const daysToShow = timeRange === 'today' ? 1 : timeRange === '7days' ? 7 : 14;
+                let daysToShow = 14;
+                if (timeRange === 'today') daysToShow = 1;
+                else if (timeRange === '7days') daysToShow = 7;
+                else if (timeRange === '30days') daysToShow = 30;
+                else if (timeRange === 'currentMonth') daysToShow = now.getDate();
+                else if (timeRange === 'total') daysToShow = 30; // Show last 30 days for total view
 
                 // Initialize days with 0
                 for (let i = daysToShow - 1; i >= 0; i--) {
@@ -204,33 +221,51 @@ export default function DashboardPage() {
                     <h2 className="text-3xl font-bold tracking-tight mb-1 dark:text-white">Dashboard</h2>
                     <p className="text-slate-500 dark:text-slate-400">Visão geral em tempo real.</p>
                 </div>
-                <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div className="flex flex-wrap items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm gap-1">
                     <button
                         onClick={() => setTimeRange('today')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'today'
-                                ? 'bg-primary text-white shadow-md'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'today'
+                            ? 'bg-primary text-white shadow-md'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                             }`}
                     >
                         Hoje
                     </button>
                     <button
                         onClick={() => setTimeRange('7days')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === '7days'
-                                ? 'bg-primary text-white shadow-md'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === '7days'
+                            ? 'bg-primary text-white shadow-md'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                             }`}
                     >
                         7 dias
                     </button>
                     <button
-                        onClick={() => setTimeRange('month')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'month'
-                                ? 'bg-primary text-white shadow-md'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        onClick={() => setTimeRange('30days')}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === '30days'
+                            ? 'bg-primary text-white shadow-md'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
                             }`}
                     >
                         30 dias
+                    </button>
+                    <button
+                        onClick={() => setTimeRange('currentMonth')}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'currentMonth'
+                            ? 'bg-primary text-white shadow-md'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                    >
+                        Mês atual
+                    </button>
+                    <button
+                        onClick={() => setTimeRange('total')}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'total'
+                            ? 'bg-primary text-white shadow-md'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                    >
+                        Total
                     </button>
                 </div>
             </header>
