@@ -61,8 +61,24 @@ export default function DashboardPage() {
         try {
             setLoading(true);
 
+            // Calculate date range based on timeRange
+            const now = new Date();
+            let startDate = new Date();
+
+            switch (timeRange) {
+                case 'today':
+                    startDate.setHours(0, 0, 0, 0);
+                    break;
+                case '7days':
+                    startDate.setDate(now.getDate() - 7);
+                    break;
+                case 'month':
+                    startDate.setDate(now.getDate() - 30);
+                    break;
+            }
+
             // 1. Fetch Requests & Calc KPIs
-            // Get data for chart and KPIs (simplified: fetching all for now, optimizing later for large datasets)
+            // Get data for chart and KPIs filtered by date range
             const { data: requests, error } = await supabase
                 .from('requests')
                 .select(`
@@ -73,6 +89,7 @@ export default function DashboardPage() {
                     client_id,
                     clients (name_first, name_last, whatsapp, company_name)
                 `)
+                .gte('created_at', startDate.toISOString())
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -100,12 +117,15 @@ export default function DashboardPage() {
                     conversionRate: found > 0 ? Math.round((deals / found) * 100) : 0
                 });
 
-                // 2. Chart Data (Group by Day - Last 14 days)
+                // 2. Chart Data (Group by Day - Dynamic based on timeRange)
                 const daysMap = new Map();
                 const now = new Date();
 
-                // Initialize last 14 days with 0
-                for (let i = 13; i >= 0; i--) {
+                // Determine number of days to show based on timeRange
+                const daysToShow = timeRange === 'today' ? 1 : timeRange === '7days' ? 7 : 14;
+
+                // Initialize days with 0
+                for (let i = daysToShow - 1; i >= 0; i--) {
                     const d = new Date();
                     d.setDate(now.getDate() - i);
                     const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -184,12 +204,35 @@ export default function DashboardPage() {
                     <h2 className="text-3xl font-bold tracking-tight mb-1 dark:text-white">Dashboard</h2>
                     <p className="text-slate-500 dark:text-slate-400">Visão geral em tempo real.</p>
                 </div>
-                {/* 
                 <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                   <button onClick={() => setTimeRange('today')} ...>Hoje</button>
-                   ... Filter UI can be implemented later ...
-                </div> 
-                */}
+                    <button
+                        onClick={() => setTimeRange('today')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'today'
+                                ? 'bg-primary text-white shadow-md'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                    >
+                        Hoje
+                    </button>
+                    <button
+                        onClick={() => setTimeRange('7days')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === '7days'
+                                ? 'bg-primary text-white shadow-md'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                    >
+                        7 dias
+                    </button>
+                    <button
+                        onClick={() => setTimeRange('month')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${timeRange === 'month'
+                                ? 'bg-primary text-white shadow-md'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                    >
+                        30 dias
+                    </button>
+                </div>
             </header>
 
             {loading ? (
