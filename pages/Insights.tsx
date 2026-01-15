@@ -8,7 +8,8 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Cell
+    Cell,
+    LabelList
 } from 'recharts';
 
 // --- Types ---
@@ -88,6 +89,7 @@ export default function InsightsPage() {
     // User reported "empty charts", likely purely due to date range on test data.
     const [dateRange, setDateRange] = useState<DateRangeOption>('total');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+    const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [rawData, setRawData] = useState<any[]>([]);
 
@@ -169,10 +171,15 @@ export default function InsightsPage() {
             return true; // 'all'
         });
 
-        // 2. Aggregate Data for Charts
-        const aggregate = (key: string, limit = 5): ChartData[] => {
+        // 2. Apply Product Filter (for brands, models, years only)
+        const filteredByProduct = selectedProduct
+            ? filtered.filter(item => item.prod_title === selectedProduct)
+            : filtered;
+
+        // 3. Aggregate Data for Charts
+        const aggregate = (data: any[], key: string, limit = 5): ChartData[] => {
             const counts: Record<string, number> = {};
-            filtered.forEach(item => {
+            data.forEach(item => {
                 const val = item[key];
                 if (val) {
                     // Normalize
@@ -188,12 +195,12 @@ export default function InsightsPage() {
         };
 
         return {
-            products: aggregate('prod_title'),
-            brands: aggregate('car_brand'),
-            models: aggregate('car_model'),
-            years: aggregate('car_year').sort((a, b) => Number(a.name) - Number(b.name)) // Years usually sorted chronologically
+            products: aggregate(filtered, 'prod_title'), // No product filter for products chart
+            brands: aggregate(filteredByProduct, 'car_brand'), // Filtered by selected product
+            models: aggregate(filteredByProduct, 'car_model'), // Filtered by selected product
+            years: aggregate(filteredByProduct, 'car_year').sort((a, b) => Number(a.name) - Number(b.name)) // Filtered by selected product
         };
-    }, [rawData, statusFilter]);
+    }, [rawData, statusFilter, selectedProduct]);
 
     // --- Render ---
 
@@ -207,6 +214,19 @@ export default function InsightsPage() {
             );
         }
         return null;
+    };
+
+    // Handle product click for filtering
+    const handleProductClick = (data: any) => {
+        if (data && data.activePayload && data.activePayload[0]) {
+            const productName = data.activePayload[0].payload.name;
+            setSelectedProduct(prev => prev === productName ? null : productName);
+        }
+    };
+
+    // Clear product filter
+    const clearProductFilter = () => {
+        setSelectedProduct(null);
     };
 
     return (
@@ -238,6 +258,23 @@ export default function InsightsPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Product Filter Indicator */}
+                {selectedProduct && (
+                    <div className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-3 rounded-xl">
+                        <span className="material-icons-round text-purple-600 dark:text-purple-400 text-sm">filter_alt</span>
+                        <span className="text-sm font-medium text-purple-900 dark:text-purple-300">
+                            Filtrando por produto: <strong>{selectedProduct}</strong>
+                        </span>
+                        <button
+                            onClick={clearProductFilter}
+                            className="ml-auto flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg transition-colors"
+                        >
+                            <span className="material-icons-round text-sm">close</span>
+                            Limpar
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Content */}
@@ -251,7 +288,13 @@ export default function InsightsPage() {
                     {/* 1. Principais Produtos */}
                     <ChartCard title="Principais Produtos">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={processedData.products} margin={{ left: 40, right: 20 }}>
+                            <BarChart
+                                layout="vertical"
+                                data={processedData.products}
+                                margin={{ left: 40, right: 40 }}
+                                onClick={handleProductClick}
+                                style={{ cursor: 'pointer' }}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" hide />
                                 <YAxis
@@ -263,8 +306,17 @@ export default function InsightsPage() {
                                 <Tooltip content={<CustomTooltip />} />
                                 <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
                                     {processedData.products.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS.purple} />
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={selectedProduct === entry.name ? '#6d28d9' : COLORS.purple}
+                                            opacity={selectedProduct === entry.name ? 1 : selectedProduct ? 0.4 : 1}
+                                        />
                                     ))}
+                                    <LabelList
+                                        dataKey="value"
+                                        position="right"
+                                        style={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                                    />
                                 </Bar>
                             </BarChart>
                         </ResponsiveContainer>
@@ -273,7 +325,7 @@ export default function InsightsPage() {
                     {/* 2. Por Marca */}
                     <ChartCard title="Por Marca">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={processedData.brands} margin={{ left: 20 }}>
+                            <BarChart layout="vertical" data={processedData.brands} margin={{ left: 20, right: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" hide />
                                 <YAxis
@@ -283,7 +335,13 @@ export default function InsightsPage() {
                                     tick={{ fontSize: 12, fill: '#64748b' }}
                                 />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="value" fill={COLORS.primary} radius={[0, 4, 4, 0]} barSize={24} />
+                                <Bar dataKey="value" fill={COLORS.primary} radius={[0, 4, 4, 0]} barSize={24}>
+                                    <LabelList
+                                        dataKey="value"
+                                        position="right"
+                                        style={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                                    />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </ChartCard>
@@ -291,7 +349,7 @@ export default function InsightsPage() {
                     {/* 3. Por Modelo */}
                     <ChartCard title="Por Modelo">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={processedData.models} margin={{ left: 20 }}>
+                            <BarChart layout="vertical" data={processedData.models} margin={{ left: 20, right: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" hide />
                                 <YAxis
@@ -301,7 +359,13 @@ export default function InsightsPage() {
                                     tick={{ fontSize: 12, fill: '#64748b' }}
                                 />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="value" fill={COLORS.secondary} radius={[0, 4, 4, 0]} barSize={24} />
+                                <Bar dataKey="value" fill={COLORS.secondary} radius={[0, 4, 4, 0]} barSize={24}>
+                                    <LabelList
+                                        dataKey="value"
+                                        position="right"
+                                        style={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                                    />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </ChartCard>
@@ -309,7 +373,7 @@ export default function InsightsPage() {
                     {/* 4. Por Ano */}
                     <ChartCard title="Por Ano">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={processedData.years} margin={{ top: 20 }}>
+                            <BarChart data={processedData.years} margin={{ top: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis
                                     dataKey="name"
@@ -319,7 +383,13 @@ export default function InsightsPage() {
                                 />
                                 <YAxis hide />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="value" fill={COLORS.tertiary} radius={[4, 4, 0, 0]} barSize={40} />
+                                <Bar dataKey="value" fill={COLORS.tertiary} radius={[4, 4, 0, 0]} barSize={40}>
+                                    <LabelList
+                                        dataKey="value"
+                                        position="top"
+                                        style={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
+                                    />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </ChartCard>
