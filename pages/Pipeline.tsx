@@ -167,21 +167,17 @@ export default function PipelinePage() {
                 `)
                 .order('created_at', { ascending: false });
 
-            // 1. Filter by Archived (based on request)
-            if (!showArchived) {
-                query = query.or('requests.archived.is.null,requests.archived.eq.false');
-            } else {
-                query = query.eq('requests.archived', true);
-            }
+            // Note: Cannot filter by requests.archived directly in the query due to join limitations
+            // Will filter client-side after fetching
 
-            // 2. Filter by Verification Status
+            // 1. Filter by Verification Status
             if (verificationFilter === 'verified') {
                 query = query.not('selected_id', 'is', null);
             } else if (verificationFilter === 'unverified') {
                 query = query.is('selected_id', null);
             }
 
-            // 3. Filter Date Range
+            // 2. Filter Date Range
             const now = new Date();
             let startDate = new Date();
             switch (dateRange) {
@@ -211,6 +207,12 @@ export default function PipelinePage() {
             if (error) throw error;
 
             let filteredData = data || [];
+
+            // 3. Filter by Archived (client-side due to join limitations)
+            filteredData = filteredData.filter((prod: any) => {
+                const isArchived = prod.requests?.archived === true;
+                return showArchived ? isArchived : !isArchived;
+            });
 
             // 4. Filter Search Term (Client-side)
             if (searchTerm.trim()) {
@@ -308,11 +310,9 @@ export default function PipelinePage() {
                 created_at: rawProd.created_at,
                 total_price: null,
                 ordered_prods: [{
+                    prod_id: rawProd.prod_id?.toString(),
                     prod_title: rawProd.prod_title,
-                    car_brand: rawProd.car_brand,
-                    car_model: rawProd.car_model,
-                    car_year: rawProd.car_year,
-                    prod_quantity: rawProd.prod_quantity
+                    prod_price: undefined // Price not available in requests_products
                 }],
                 client: rawProd.requests?.clients ? {
                     client_id: rawProd.requests.clients.client_id,
