@@ -218,9 +218,24 @@ export default function InsightsPage() {
 
     // Handle product click for filtering
     const handleProductClick = (data: any) => {
+        console.log('Click event data:', data); // Debug
+
+        // Try multiple ways to get the product name from the click event
+        let productName: string | null = null;
+
         if (data && data.activePayload && data.activePayload[0]) {
-            const productName = data.activePayload[0].payload.name;
-            setSelectedProduct(prev => prev === productName ? null : productName);
+            productName = data.activePayload[0].payload.name;
+        } else if (data && data.activeLabel) {
+            productName = data.activeLabel;
+        }
+
+        if (productName) {
+            console.log('Selected product:', productName); // Debug
+            setSelectedProduct(prev => {
+                const newValue = prev === productName ? null : productName;
+                console.log('New selectedProduct:', newValue); // Debug
+                return newValue;
+            });
         }
     };
 
