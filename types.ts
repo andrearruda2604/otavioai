@@ -12,6 +12,8 @@ export interface KanbanCardData {
     verified?: boolean;
     chatId?: string;
     clientId?: number;
+    carInfo?: string; // Brand, model, year combined
+    quantity?: number; // Product quantity
 }
 
 export interface ChatMessage {

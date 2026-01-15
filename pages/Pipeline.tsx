@@ -6,6 +6,7 @@ import { PipelineDetailsSidebar, PipelineRequest } from '../components/PipelineD
 // --- Types & Components ---
 
 type DateRangeOption = 'today' | '7days' | '30days' | 'month' | 'total';
+type VerificationFilter = 'all' | 'verified' | 'unverified';
 
 const FilterButton = ({
     active,
@@ -63,6 +64,8 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards,
                             </div>
                             <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400 mb-4">
                                 <p className="font-mono text-xs text-slate-400">#{card.id}</p>
+                                {card.carInfo && <p className="text-xs font-medium text-primary dark:text-primary-light">{card.carInfo}</p>}
+                                {card.quantity && <p className="text-xs">Qtd: {card.quantity}</p>}
                                 <p>{card.date}</p>
                                 <p className="font-medium text-slate-700 dark:text-slate-300 truncate">{card.user}</p>
                             </div>
@@ -103,6 +106,7 @@ export default function PipelinePage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [showArchived, setShowArchived] = useState(false);
     const [dateRange, setDateRange] = useState<DateRangeOption>('total');
+    const [verificationFilter, setVerificationFilter] = useState<VerificationFilter>('all');
     const [columns, setColumns] = useState<{ [key: string]: KanbanCardData[] }>({
         'Not Found': [],
         'Pending Feedback': [],
@@ -111,53 +115,73 @@ export default function PipelinePage() {
     });
     const [loading, setLoading] = useState(true);
 
-    // Store raw request data for detail view
-    const [rawRequests, setRawRequests] = useState<any[]>([]);
+    // Store raw product data for detail view
+    const [rawProducts, setRawProducts] = useState<any[]>([]);
     const [selectedRequest, setSelectedRequest] = useState<PipelineRequest | null>(null);
 
     useEffect(() => {
         fetchPipelineData();
 
-        // Realtime subscription for requests updates
+        // Realtime subscription for products updates
         const channel = supabase
-            .channel('public:requests')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+            .channel('public:requests_products')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'requests_products' }, () => {
                 fetchPipelineData();
             })
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, [searchTerm, showArchived, dateRange]);
+    }, [searchTerm, showArchived, dateRange, verificationFilter]);
 
     const fetchPipelineData = async () => {
         try {
             setLoading(true);
+
+            // Fetch products with request and client data
             let query = supabase
-                .from('requests')
+                .from('requests_products')
                 .select(`
-                    request_id,
-                    created_at,
+                    prod_id,
+                    prod_title,
+                    car_brand,
+                    car_model,
+                    car_year,
+                    search_result,
                     status,
-                    total_price,
-                    ordered_prods,
-                    archived,
-                    clients (
+                    deal_status,
+                    prod_quantity,
+                    selected_id,
+                    created_at,
+                    requests (
+                        request_id,
                         client_id,
-                        name_first,
-                        name_last,
-                        whatsapp
+                        archived,
+                        clients (
+                            client_id,
+                            name_first,
+                            name_last,
+                            whatsapp,
+                            company_name
+                        )
                     )
                 `)
                 .order('created_at', { ascending: false });
 
-            // 1. Filter Archived
+            // 1. Filter by Archived (based on request)
             if (!showArchived) {
-                query = query.or('archived.is.null,archived.eq.false');
+                query = query.or('requests.archived.is.null,requests.archived.eq.false');
             } else {
-                query = query.eq('archived', true);
+                query = query.eq('requests.archived', true);
             }
 
-            // 2. Filter Date Range
+            // 2. Filter by Verification Status
+            if (verificationFilter === 'verified') {
+                query = query.not('selected_id', 'is', null);
+            } else if (verificationFilter === 'unverified') {
+                query = query.is('selected_id', null);
+            }
+
+            // 3. Filter Date Range
             const now = new Date();
             let startDate = new Date();
             switch (dateRange) {
@@ -188,18 +212,21 @@ export default function PipelinePage() {
 
             let filteredData = data || [];
 
-            // 3. Filter Search Term (Client-side)
+            // 4. Filter Search Term (Client-side)
             if (searchTerm.trim()) {
                 const lower = searchTerm.toLowerCase();
-                filteredData = filteredData.filter((req: any) => {
-                    const clientName = req.clients ? `${req.clients.name_first} ${req.clients.name_last}`.toLowerCase() : '';
-                    const title = req.ordered_prods?.[0]?.prod_title?.toLowerCase() || '';
-                    return clientName.includes(lower) || title.includes(lower);
+                filteredData = filteredData.filter((prod: any) => {
+                    const clientName = prod.requests?.clients
+                        ? `${prod.requests.clients.name_first} ${prod.requests.clients.name_last}`.toLowerCase()
+                        : '';
+                    const title = prod.prod_title?.toLowerCase() || '';
+                    const carInfo = `${prod.car_brand || ''} ${prod.car_model || ''} ${prod.car_year || ''}`.toLowerCase();
+                    return clientName.includes(lower) || title.includes(lower) || carInfo.includes(lower);
                 });
             }
 
             // Store raw data for detail view
-            setRawRequests(filteredData);
+            setRawProducts(filteredData);
 
             // Map data to columns
             const newColumns: { [key: string]: KanbanCardData[] } = {
@@ -209,35 +236,52 @@ export default function PipelinePage() {
                 'Deal': []
             };
 
-            // Mapping function from DB Status to UI Column
-            const mapStatus = (status: string | null) => {
-                if (!status) return 'Not Found'; // Default column
-                const s = status.toLowerCase();
-                if (s.includes('deal') || s.includes('won') || s.includes('closed')) return 'Deal';
-                if (s.includes('cancel') || s.includes('lost')) return 'Cancelled';
-                if (s.includes('feedback') || s.includes('quota') || s.includes('wait')) return 'Pending Feedback';
-                return 'Not Found'; // Fallback for 'Open', 'New', etc.
-            };
-
-            filteredData.forEach((req: any) => {
-                const columnTitle = mapStatus(req.status);
-
-                // Extract title from ordered_prods or default
-                let title = "Solicitação";
-                if (req.ordered_prods && Array.isArray(req.ordered_prods) && req.ordered_prods.length > 0) {
-                    title = req.ordered_prods[0].prod_title || "Produto sem nome";
+            // Mapping function from product data to UI Column
+            const mapStatus = (product: any) => {
+                // If not found
+                if (!product.search_result || product.search_result === false) {
+                    return 'Not Found';
                 }
 
-                const clientName = req.clients ? `${req.clients.name_first || ''} ${req.clients.name_last || ''}`.trim() : 'Desconhecido';
+                // If has deal_status, use it
+                if (product.deal_status) {
+                    const ds = product.deal_status.toLowerCase();
+                    if (ds.includes('deal') || ds.includes('won') || ds.includes('closed')) {
+                        return 'Deal';
+                    }
+                    if (ds.includes('cancel') || ds.includes('lost')) {
+                        return 'Cancelled';
+                    }
+                }
+
+                // If found but no selection
+                if (product.search_result && !product.selected_id) {
+                    return 'Pending Feedback';
+                }
+
+                // Default
+                return 'Pending Feedback';
+            };
+
+            filteredData.forEach((prod: any) => {
+                const columnTitle = mapStatus(prod);
+
+                const clientName = prod.requests?.clients
+                    ? `${prod.requests.clients.name_first || ''} ${prod.requests.clients.name_last || ''}`.trim()
+                    : 'Desconhecido';
+
+                const carInfo = `${prod.car_brand || ''} ${prod.car_model || ''} ${prod.car_year || ''}`.trim();
 
                 const card: KanbanCardData = {
-                    id: req.request_id.toString(),
-                    title: title,
-                    date: new Date(req.created_at).toLocaleDateString('pt-BR'),
+                    id: prod.prod_id.toString(),
+                    title: prod.prod_title || 'Produto sem nome',
+                    date: new Date(prod.created_at).toLocaleDateString('pt-BR'),
                     user: clientName,
-                    chatId: req.clients?.whatsapp, // Ensuring link to chat
-                    verified: !!req.total_price, // Dummy verification logic
-                    clientId: req.clients?.client_id
+                    chatId: prod.requests?.clients?.whatsapp,
+                    verified: !!prod.selected_id,
+                    clientId: prod.requests?.clients?.client_id,
+                    carInfo: carInfo || undefined,
+                    quantity: prod.prod_quantity || undefined
                 };
 
                 if (newColumns[columnTitle]) {
@@ -254,24 +298,30 @@ export default function PipelinePage() {
     };
 
     const handleCardClick = (card: KanbanCardData) => {
-        // Find the full raw request data
-        const rawReq = rawRequests.find((r: any) => r.request_id.toString() === card.id);
-        if (rawReq) {
+        // Find the full raw product data
+        const rawProd = rawProducts.find((p: any) => p.prod_id.toString() === card.id);
+        if (rawProd) {
             const mappedRequest: PipelineRequest = {
-                request_id: rawReq.request_id,
+                request_id: rawProd.requests?.request_id || 0,
                 title: card.title,
-                status: rawReq.status || '',
-                created_at: rawReq.created_at,
-                total_price: rawReq.total_price,
-                ordered_prods: rawReq.ordered_prods,
-                client: rawReq.clients ? {
-                    client_id: rawReq.clients.client_id,
-                    name_first: rawReq.clients.name_first,
-                    name_last: rawReq.clients.name_last,
-                    whatsapp: rawReq.clients.whatsapp,
-                    company: rawReq.clients.company
+                status: rawProd.deal_status || rawProd.status || '',
+                created_at: rawProd.created_at,
+                total_price: null,
+                ordered_prods: [{
+                    prod_title: rawProd.prod_title,
+                    car_brand: rawProd.car_brand,
+                    car_model: rawProd.car_model,
+                    car_year: rawProd.car_year,
+                    prod_quantity: rawProd.prod_quantity
+                }],
+                client: rawProd.requests?.clients ? {
+                    client_id: rawProd.requests.clients.client_id,
+                    name_first: rawProd.requests.clients.name_first,
+                    name_last: rawProd.requests.clients.name_last,
+                    whatsapp: rawProd.requests.clients.whatsapp,
+                    company: rawProd.requests.clients.company_name
                 } : undefined,
-                verified: !!rawReq.total_price
+                verified: !!rawProd.selected_id
             };
             setSelectedRequest(mappedRequest);
         }
@@ -282,27 +332,28 @@ export default function PipelinePage() {
     };
 
     const handleVerify = async (requestId: number) => {
-        // Implement verification logic: update total_price or a dedicated 'verified' field
-        // For now, we'll just toggle visual state by updating total_price to a default value
+        // For products, we need to find the product and toggle its selected_id
         try {
-            const req = rawRequests.find((r: any) => r.request_id === requestId);
-            const newPrice = req?.total_price ? null : 1; // Toggle: if has price, remove; if no price, set to 1 (dummy)
+            const prod = rawProducts.find((p: any) => p.requests?.request_id === requestId);
+            if (!prod) return;
+
+            const newSelectedId = prod.selected_id ? null : 1; // Toggle: if has selection, remove; if no selection, set to 1 (dummy)
 
             await supabase
-                .from('requests')
-                .update({ total_price: newPrice })
-                .eq('request_id', requestId);
+                .from('requests_products')
+                .update({ selected_id: newSelectedId })
+                .eq('prod_id', prod.prod_id);
 
             fetchPipelineData();
             setSelectedRequest(null);
         } catch (error) {
-            console.error('Error verifying request:', error);
+            console.error('Error verifying product:', error);
         }
     };
 
     const handleArchive = async (requestId: number) => {
-        const req = rawRequests.find((r: any) => r.request_id === requestId);
-        if (!req?.clients?.client_id) return;
+        const prod = rawProducts.find((p: any) => p.requests?.request_id === requestId);
+        if (!prod?.requests?.clients?.client_id) return;
 
         const confirm = window.confirm(`Deseja arquivar esta solicitação?`);
         if (!confirm) return;
@@ -378,6 +429,30 @@ export default function PipelinePage() {
                         <FilterButton active={dateRange === '30days'} onClick={() => setDateRange('30days')} label="30 dias" />
                         <FilterButton active={dateRange === 'month'} onClick={() => setDateRange('month')} label="Mês atual" />
                         <FilterButton active={dateRange === 'total'} onClick={() => setDateRange('total')} label="Total" />
+                    </div>
+
+                    <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
+
+                    {/* Verification Filter */}
+                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                        <button
+                            onClick={() => setVerificationFilter('all')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${verificationFilter === 'all' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                        >
+                            Todos
+                        </button>
+                        <button
+                            onClick={() => setVerificationFilter('verified')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${verificationFilter === 'verified' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                        >
+                            Verificados
+                        </button>
+                        <button
+                            onClick={() => setVerificationFilter('unverified')}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${verificationFilter === 'unverified' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                        >
+                            Não Verificados
+                        </button>
                     </div>
 
                     <div className="hidden md:block w-px h-6 bg-slate-200 dark:bg-slate-700 mx-2"></div>
