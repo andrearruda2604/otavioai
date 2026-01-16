@@ -35,9 +35,10 @@ interface KanbanColumnProps {
     cards: KanbanCardData[];
     onCardClick: (card: KanbanCardData) => void;
     onArchive?: (card: KanbanCardData) => void;
+    onVerify?: (card: KanbanCardData) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards, onCardClick, onArchive }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards, onCardClick, onArchive, onVerify }) => {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between mb-2">
@@ -89,7 +90,14 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards,
                                     ) : (
                                         <div className="flex items-center gap-2 group/check" onClick={(e) => e.stopPropagation()}>
                                             <span className="text-xs font-medium text-slate-400 group-hover/check:text-slate-600 dark:group-hover/check:text-slate-300 transition-colors">Verificar</span>
-                                            <input className="rounded text-primary focus:ring-primary border-slate-200 dark:border-slate-700 dark:bg-slate-800" type="checkbox" />
+                                            <input
+                                                className="rounded text-primary focus:ring-primary border-slate-200 dark:border-slate-700 dark:bg-slate-800 cursor-pointer"
+                                                type="checkbox"
+                                                onChange={(e) => {
+                                                    e.stopPropagation();
+                                                    if (onVerify) onVerify(card);
+                                                }}
+                                            />
                                         </div>
                                     )}
                                 </div>
@@ -372,6 +380,27 @@ export default function PipelinePage() {
         }
     };
 
+    const handleVerifyFromCard = async (card: KanbanCardData) => {
+        try {
+            // Find the product by card ID
+            const prod = rawProducts.find((p: any) => p.prod_id.toString() === card.id);
+            if (!prod) return;
+
+            // Toggle verification: set selected_id to 1 if null, or null if has value
+            const newSelectedId = prod.selected_id ? null : 1;
+
+            await supabase
+                .from('requests_products')
+                .update({ selected_id: newSelectedId })
+                .eq('prod_id', prod.prod_id);
+
+            // Refresh data to show updated verification status
+            fetchPipelineData();
+        } catch (error) {
+            console.error('Error verifying product from card:', error);
+        }
+    };
+
     const handleBulkArchive = async (card: KanbanCardData) => {
         if (!card.clientId) return;
 
@@ -495,10 +524,10 @@ export default function PipelinePage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
-                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
-                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
-                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onCardClick={handleCardClick} onArchive={handleBulkArchive} />
+                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
+                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
+                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
+                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
                 </div>
             )}
 
