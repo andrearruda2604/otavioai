@@ -160,6 +160,7 @@ export default function PipelinePage() {
                     prod_quantity,
                     selected_id,
                     created_at,
+                    search_prod_ids,
                     requests (
                         request_id,
                         client_id,
@@ -307,21 +308,55 @@ export default function PipelinePage() {
         }
     };
 
-    const handleCardClick = (card: KanbanCardData) => {
+    const handleCardClick = async (card: KanbanCardData) => {
         // Find the full raw product data
         const rawProd = rawProducts.find((p: any) => p.prod_id.toString() === card.id);
         if (rawProd) {
+            // Fetch stock products if search_prod_ids exists
+            let stockProducts: any[] = [];
+            if (rawProd.search_prod_ids && rawProd.search_prod_ids.length > 0) {
+                const { data: stockData } = await supabase
+                    .from('stock_products')
+                    .select(`
+                        product_id,
+                        product_title,
+                        url,
+                        unit_price,
+                        supplier_id,
+                        suppliers (
+                            supplier_id,
+                            name,
+                            apex_domain
+                        )
+                    `)
+                    .in('product_id', rawProd.search_prod_ids.map((id: string) => parseInt(id)));
+
+                stockProducts = stockData || [];
+            }
+
             const mappedRequest: PipelineRequest = {
                 request_id: rawProd.requests?.request_id || 0,
                 title: card.title,
                 status: rawProd.deal_status || rawProd.status || '',
                 created_at: rawProd.created_at,
                 total_price: null,
-                ordered_prods: [{
-                    prod_id: rawProd.prod_id?.toString(),
-                    prod_title: rawProd.prod_title,
-                    prod_price: undefined // Price not available in requests_products
-                }],
+                ordered_prods: stockProducts.length > 0
+                    ? stockProducts.map((sp: any) => ({
+                        prod_id: sp.product_id?.toString(),
+                        prod_title: rawProd.prod_title, // Title from request
+                        prod_price: undefined, // Not used in current display
+                        // Stock product details
+                        stock_product_title: sp.product_title,
+                        stock_product_url: sp.url,
+                        stock_unit_price: sp.unit_price,
+                        supplier_name: sp.suppliers?.name,
+                        supplier_domain: sp.suppliers?.apex_domain
+                    }))
+                    : [{
+                        prod_id: rawProd.prod_id?.toString(),
+                        prod_title: rawProd.prod_title,
+                        prod_price: undefined
+                    }],
                 client: rawProd.requests?.clients ? {
                     client_id: rawProd.requests.clients.client_id,
                     name_first: rawProd.requests.clients.name_first,
