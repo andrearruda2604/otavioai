@@ -392,6 +392,7 @@ export default function PipelinePage() {
 
             console.log('Mapped request:', mappedRequest);
             console.log('ordered_prods:', mappedRequest.ordered_prods);
+            console.log('ordered_prods JSON:', JSON.stringify(mappedRequest.ordered_prods, null, 2));
 
             setSelectedRequest(mappedRequest);
         }
