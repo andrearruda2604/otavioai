@@ -311,11 +311,17 @@ export default function PipelinePage() {
     const handleCardClick = async (card: KanbanCardData) => {
         // Find the full raw product data
         const rawProd = rawProducts.find((p: any) => p.prod_id.toString() === card.id);
+        console.log('Raw product data:', rawProd);
+
         if (rawProd) {
             // Fetch stock products if search_prod_ids exists
             let stockProducts: any[] = [];
+            console.log('search_prod_ids:', rawProd.search_prod_ids);
+
             if (rawProd.search_prod_ids && rawProd.search_prod_ids.length > 0) {
-                const { data: stockData } = await supabase
+                console.log('Fetching stock products for IDs:', rawProd.search_prod_ids);
+
+                const { data: stockData, error: stockError } = await supabase
                     .from('stock_products')
                     .select(`
                         product_id,
@@ -331,7 +337,12 @@ export default function PipelinePage() {
                     `)
                     .in('product_id', rawProd.search_prod_ids.map((id: string) => parseInt(id)));
 
+                if (stockError) {
+                    console.error('Error fetching stock products:', stockError);
+                }
+
                 stockProducts = stockData || [];
+                console.log('Stock products found:', stockProducts.length, stockProducts);
             }
 
             const mappedRequest: PipelineRequest = {
@@ -371,6 +382,10 @@ export default function PipelinePage() {
                 car_model: rawProd.car_model,
                 car_year: rawProd.car_year
             };
+
+            console.log('Mapped request:', mappedRequest);
+            console.log('ordered_prods:', mappedRequest.ordered_prods);
+
             setSelectedRequest(mappedRequest);
         }
     };
