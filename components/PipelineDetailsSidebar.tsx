@@ -78,6 +78,10 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
     const navigate = useNavigate();
     const [expandedProducts, setExpandedProducts] = React.useState<Set<number>>(new Set());
 
+    console.log('[Sidebar] Request received:', request);
+    console.log('[Sidebar] ordered_prods:', request?.ordered_prods);
+    console.log('[Sidebar] ordered_prods length:', request?.ordered_prods?.length);
+
     if (!isOpen || !request) return null;
 
     const clientName = request.client
