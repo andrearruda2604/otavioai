@@ -78,10 +78,6 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
     const navigate = useNavigate();
     const [expandedProducts, setExpandedProducts] = React.useState<Set<number>>(new Set());
 
-    console.log('[Sidebar] Request received:', request);
-    console.log('[Sidebar] ordered_prods:', request?.ordered_prods);
-    console.log('[Sidebar] ordered_prods length:', request?.ordered_prods?.length);
-
     if (!isOpen || !request) return null;
 
     const clientName = request.client
@@ -179,76 +175,74 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                 Produtos Encontrados
                             </p>
                             <div className="space-y-3">
-                                {request.ordered_prods.map((prod, idx) => {
-                                    console.log(`[Sidebar] Rendering product ${idx}:`, prod);
-                                    return (
-                                        <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
-                                            <div className="p-3 flex justify-between items-start">
-                                                <div className="flex-1">
-                                                    <p className="text-xs text-slate-400">COD-{prod.prod_id || idx}</p>
-                                                    <p className="font-medium text-slate-800 dark:text-white text-sm">{prod.prod_title || 'Produto'}</p>
-                                                    {prod.prod_price && (
-                                                        <p className="text-sm font-semibold text-emerald-600">R$ {prod.prod_price.toFixed(2).replace('.', ',')}</p>
-                                                    )}
-                                                </div>
-                                                {prod.stock_product_title && (
-                                                    <button
-                                                        onClick={() => toggleProductExpansion(idx)}
-                                                        className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1"
-                                                    >
-                                                        <span className="text-xs font-medium">Detalhes</span>
-                                                        <span className={`material-icons-round text-sm transition-transform ${expandedProducts.has(idx) ? 'rotate-180' : ''}`}>
-                                                            expand_more
-                                                        </span>
-                                                    </button>
+                                {request.ordered_prods.map((prod, idx) => (
+                                    <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
+                                        <div className="p-3 flex justify-between items-start">
+                                            <div className="flex-1">
+                                                <p className="text-xs text-slate-400">COD-{prod.prod_id || idx}</p>
+                                                <p className="font-medium text-slate-800 dark:text-white text-sm">{prod.prod_title || 'Produto'}</p>
+                                                {prod.prod_price && (
+                                                    <p className="text-sm font-semibold text-emerald-600">R$ {prod.prod_price.toFixed(2).replace('.', ',')}</p>
                                                 )}
                                             </div>
-                                            {expandedProducts.has(idx) && prod.stock_product_title && (
-                                                <div className="px-3 pb-3 pt-0 border-t border-slate-200 dark:border-slate-700 mt-2 space-y-2">
-                                                    <div className="pt-2">
-                                                        <p className="text-xs text-slate-400 mb-1">Produto no Estoque:</p>
-                                                        {prod.stock_product_url ? (
+                                            {prod.stock_product_title && (
+                                                <button
+                                                    onClick={() => toggleProductExpansion(idx)}
+                                                    className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1"
+                                                >
+                                                    <span className="text-xs font-medium">Detalhes</span>
+                                                    <span className={`material-icons-round text-sm transition-transform ${expandedProducts.has(idx) ? 'rotate-180' : ''}`}>
+                                                        expand_more
+                                                    </span>
+                                                </button>
+                                            )}
+                                        </div>
+                                        {expandedProducts.has(idx) && prod.stock_product_title && (
+                                            <div className="px-3 pb-3 pt-0 border-t border-slate-200 dark:border-slate-700 mt-2 space-y-2">
+                                                <div className="pt-2">
+                                                    <p className="text-xs text-slate-400 mb-1">Produto no Estoque:</p>
+                                                    {prod.stock_product_url ? (
+                                                        <a
+                                                            href={prod.stock_product_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-sm font-medium text-primary hover:text-primary-dark dark:text-primary-light flex items-center gap-1"
+                                                        >
+                                                            {prod.stock_product_title}
+                                                            <span className="material-icons-round text-xs">open_in_new</span>
+                                                        </a>
+                                                    ) : (
+                                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{prod.stock_product_title}</p>
+                                                    )}
+                                                </div>
+                                                {prod.stock_unit_price && (
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 mb-1">Preço Unitário:</p>
+                                                        <p className="text-sm font-semibold text-emerald-600">R$ {prod.stock_unit_price.toFixed(2).replace('.', ',')}</p>
+                                                    </div>
+                                                )}
+                                                {prod.supplier_name && (
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 mb-1">Fornecedor:</p>
+                                                        {prod.supplier_domain ? (
                                                             <a
-                                                                href={prod.stock_product_url}
+                                                                href={`https://${prod.supplier_domain}`}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className="text-sm font-medium text-primary hover:text-primary-dark dark:text-primary-light flex items-center gap-1"
                                                             >
-                                                                {prod.stock_product_title}
+                                                                {prod.supplier_name}
                                                                 <span className="material-icons-round text-xs">open_in_new</span>
                                                             </a>
                                                         ) : (
-                                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{prod.stock_product_title}</p>
+                                                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{prod.supplier_name}</p>
                                                         )}
                                                     </div>
-                                                    {prod.stock_unit_price && (
-                                                        <div>
-                                                            <p className="text-xs text-slate-400 mb-1">Preço Unitário:</p>
-                                                            <p className="text-sm font-semibold text-emerald-600">R$ {prod.stock_unit_price.toFixed(2).replace('.', ',')}</p>
-                                                        </div>
-                                                    )}
-                                                    {prod.supplier_name && (
-                                                        <div>
-                                                            <p className="text-xs text-slate-400 mb-1">Fornecedor:</p>
-                                                            {prod.supplier_domain ? (
-                                                                <a
-                                                                    href={`https://${prod.supplier_domain}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-sm font-medium text-primary hover:text-primary-dark dark:text-primary-light flex items-center gap-1"
-                                                                >
-                                                                    {prod.supplier_name}
-                                                                    <span className="material-icons-round text-xs">open_in_new</span>
-                                                                </a>
-                                                            ) : (
-                                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{prod.supplier_name}</p>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
                                 })}
                             </div>
                         </div>
