@@ -21,6 +21,11 @@ export interface PipelineRequest {
         company?: string;
     };
     verified?: boolean;
+    // Product details from requests_products
+    prod_quantity?: number;
+    car_brand?: string;
+    car_model?: string;
+    car_year?: number;
 }
 
 interface PipelineDetailsSidebarProps {
@@ -134,6 +139,12 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                             <p><span className="text-slate-400">Número:</span> #{request.request_id}</p>
                             <p><span className="text-slate-400">Data:</span> {new Date(request.created_at).toLocaleDateString('pt-BR')} às {new Date(request.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
                             <p><span className="text-slate-400">Canal:</span> WhatsApp</p>
+                            {request.prod_quantity && (
+                                <p><span className="text-slate-400">Quantidade:</span> {request.prod_quantity}</p>
+                            )}
+                            {(request.car_brand || request.car_model || request.car_year) && (
+                                <p><span className="text-slate-400">Veículo:</span> {[request.car_brand, request.car_model, request.car_year].filter(Boolean).join(' ')}</p>
+                            )}
                         </div>
                     </div>
 

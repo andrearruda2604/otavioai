@@ -329,7 +329,12 @@ export default function PipelinePage() {
                     whatsapp: rawProd.requests.clients.whatsapp,
                     company: rawProd.requests.clients.company_name
                 } : undefined,
-                verified: !!rawProd.selected_id
+                verified: !!rawProd.selected_id,
+                // Product details from requests_products
+                prod_quantity: rawProd.prod_quantity,
+                car_brand: rawProd.car_brand,
+                car_model: rawProd.car_model,
+                car_year: rawProd.car_year
             };
             setSelectedRequest(mappedRequest);
         }
