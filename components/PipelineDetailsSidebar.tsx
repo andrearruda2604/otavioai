@@ -164,38 +164,38 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                             {(request.car_brand || request.car_model || request.car_year) && (
                                 <p><span className="text-slate-400">Veículo:</span> {[request.car_brand, request.car_model, request.car_year].filter(Boolean).join(' ')}</p>
                             )}
+                            {request.title && (
+                                <p><span className="text-slate-400">Produto:</span> {request.title}</p>
+                            )}
                         </div>
                     </div>
 
-                    {/* Produtos Section */}
-                    {request.ordered_prods && request.ordered_prods.length > 0 && (
+                    {/* Produtos Section - Only show products with stock details */}
+                    {request.ordered_prods && request.ordered_prods.filter(p => p.stock_product_title).length > 0 && (
                         <div>
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
                                 <span className="material-icons-round text-sm">shopping_bag</span>
                                 Produtos Encontrados
                             </p>
                             <div className="space-y-3">
-                                {request.ordered_prods.map((prod, idx) => (
+                                {request.ordered_prods.filter(p => p.stock_product_title).map((prod, idx) => (
                                     <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
                                         <div className="p-3 flex justify-between items-start">
                                             <div className="flex-1">
-                                                <p className="text-xs text-slate-400">COD-{prod.prod_id || idx}</p>
-                                                <p className="font-medium text-slate-800 dark:text-white text-sm">{prod.prod_title || 'Produto'}</p>
-                                                {prod.prod_price && (
-                                                    <p className="text-sm font-semibold text-emerald-600">R$ {prod.prod_price.toFixed(2).replace('.', ',')}</p>
+                                                <p className="font-medium text-slate-800 dark:text-white text-sm">{prod.stock_product_title}</p>
+                                                {prod.stock_unit_price && (
+                                                    <p className="text-sm font-semibold text-emerald-600">R$ {prod.stock_unit_price.toFixed(2).replace('.', ',')}</p>
                                                 )}
                                             </div>
-                                            {prod.stock_product_title && (
-                                                <button
-                                                    onClick={() => toggleProductExpansion(idx)}
-                                                    className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1"
-                                                >
-                                                    <span className="text-xs font-medium">Detalhes</span>
-                                                    <span className={`material-icons-round text-sm transition-transform ${expandedProducts.has(idx) ? 'rotate-180' : ''}`}>
-                                                        expand_more
-                                                    </span>
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={() => toggleProductExpansion(idx)}
+                                                className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1"
+                                            >
+                                                <span className="text-xs font-medium">Detalhes</span>
+                                                <span className={`material-icons-round text-sm transition-transform ${expandedProducts.has(idx) ? 'rotate-180' : ''}`}>
+                                                    expand_more
+                                                </span>
+                                            </button>
                                         </div>
                                         {expandedProducts.has(idx) && prod.stock_product_title && (
                                             <div className="px-3 pb-3 pt-0 border-t border-slate-200 dark:border-slate-700 mt-2 space-y-2">
