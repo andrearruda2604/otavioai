@@ -277,19 +277,6 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                             </button>
                         </div>
                     </div>
-
-                    {/* Internal Notes (placeholder) */}
-                    <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                            <span className="material-icons-round text-sm">notes</span>
-                            Nota Interna
-                        </p>
-                        <textarea
-                            className="w-full border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm bg-transparent dark:text-white resize-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                            rows={3}
-                            placeholder="Adicione uma nota..."
-                        ></textarea>
-                    </div>
                 </div>
             </div>
         </>
