@@ -345,29 +345,36 @@ export default function PipelinePage() {
                 console.log('Stock products found:', stockProducts.length, stockProducts);
             }
 
+            console.log('stockProducts.length:', stockProducts.length);
+            console.log('Will use fallback?', stockProducts.length === 0);
+
+            const orderedProds = stockProducts.length > 0
+                ? stockProducts.map((sp: any) => ({
+                    prod_id: sp.product_id?.toString(),
+                    prod_title: rawProd.prod_title, // Title from request
+                    prod_price: undefined, // Not used in current display
+                    // Stock product details
+                    stock_product_title: sp.product_title,
+                    stock_product_url: sp.url,
+                    stock_unit_price: sp.unit_price,
+                    supplier_name: sp.suppliers?.name,
+                    supplier_domain: sp.suppliers?.apex_domain
+                }))
+                : [{
+                    prod_id: rawProd.prod_id?.toString(),
+                    prod_title: rawProd.prod_title,
+                    prod_price: undefined
+                }];
+
+            console.log('orderedProds created:', orderedProds);
+
             const mappedRequest: PipelineRequest = {
                 request_id: rawProd.requests?.request_id || 0,
                 title: card.title,
                 status: rawProd.deal_status || rawProd.status || '',
                 created_at: rawProd.created_at,
                 total_price: null,
-                ordered_prods: stockProducts.length > 0
-                    ? stockProducts.map((sp: any) => ({
-                        prod_id: sp.product_id?.toString(),
-                        prod_title: rawProd.prod_title, // Title from request
-                        prod_price: undefined, // Not used in current display
-                        // Stock product details
-                        stock_product_title: sp.product_title,
-                        stock_product_url: sp.url,
-                        stock_unit_price: sp.unit_price,
-                        supplier_name: sp.suppliers?.name,
-                        supplier_domain: sp.suppliers?.apex_domain
-                    }))
-                    : [{
-                        prod_id: rawProd.prod_id?.toString(),
-                        prod_title: rawProd.prod_title,
-                        prod_price: undefined
-                    }],
+                ordered_prods: orderedProds,
                 client: rawProd.requests?.clients ? {
                     client_id: rawProd.requests.clients.client_id,
                     name_first: rawProd.requests.clients.name_first,
