@@ -242,8 +242,7 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                             </div>
                                         )}
                                     </div>
-                                );
-                                })}
+                                ))}
                             </div>
                         </div>
                     )}
