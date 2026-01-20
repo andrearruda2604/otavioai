@@ -321,12 +321,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         try {
             const role = roles.find(r => r.id === roleId);
+
+            // Get current session to restore after signup
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+            // Create user with signUp (this will auto-login the new user)
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
-                options: { data: { name, role: role?.name || 'tecnico' } }
+                options: {
+                    data: { name, role: role?.name || 'tecnico' },
+                    emailRedirectTo: undefined // Prevent email confirmation redirect
+                }
             });
+
             if (error) return false;
+
+            // Immediately restore the admin session
+            if (currentSession) {
+                await supabase.auth.setSession({
+                    access_token: currentSession.access_token,
+                    refresh_token: currentSession.refresh_token
+                });
+            }
+
             await new Promise(resolve => setTimeout(resolve, 1000)); // wait for trigger
             await fetchAllUsers();
             return true;

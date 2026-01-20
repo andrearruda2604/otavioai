@@ -5,6 +5,8 @@ import ActionMenu from '../components/ActionMenu';
 
 export default function UserManagementPage() {
     const [userModalOpen, setUserModalOpen] = useState(false);
+    const [successModalOpen, setSuccessModalOpen] = useState(false);
+    const [createdUserName, setCreatedUserName] = useState('');
 
     const {
         users,
@@ -48,7 +50,12 @@ export default function UserManagementPage() {
     };
 
     const handleCreateUser = async (email: string, password: string, name: string, roleId: string) => {
-        return await createUser(email, password, name, roleId);
+        const success = await createUser(email, password, name, roleId);
+        if (success) {
+            setCreatedUserName(name);
+            setSuccessModalOpen(true);
+        }
+        return success;
     };
 
     const handleRoleChange = async (userId: string, newRoleId: string) => {
@@ -198,6 +205,32 @@ export default function UserManagementPage() {
                 onSave={handleCreateUser}
                 roles={roles}
             />
+
+            {/* Success Modal */}
+            {successModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSuccessModalOpen(false)}></div>
+                    <div className="relative bg-white dark:bg-card-dark rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                        <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="material-icons-round text-emerald-600 dark:text-emerald-400 text-4xl">check_circle</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                                Usuário criado com sucesso!
+                            </h3>
+                            <p className="text-slate-600 dark:text-slate-400 mb-6">
+                                O usuário <strong>{createdUserName}</strong> foi adicionado ao sistema.
+                            </p>
+                            <button
+                                onClick={() => setSuccessModalOpen(false)}
+                                className="w-full px-4 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg transition-colors"
+                            >
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
