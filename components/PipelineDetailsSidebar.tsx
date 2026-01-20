@@ -21,6 +21,7 @@ export interface PipelineRequest {
         // Not found flag
         not_found?: boolean;
         search_prod_ids?: string[];
+        has_search_ids?: boolean; // Indicates if search_prod_ids exists
     }>;
     client?: {
         client_id?: number;
@@ -254,7 +255,11 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                             <span className="material-icons-round text-amber-600 dark:text-amber-400 text-sm mt-0.5">warning</span>
                                             <div className="flex-1">
                                                 <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                                                    Nenhum produto com {prod.search_prod_ids && prod.search_prod_ids.length > 1 ? 'os IDs' : 'o ID'} {prod.search_prod_ids?.join(', ')} ({prod.prod_title}) encontrado no estoque
+                                                    {prod.has_search_ids ? (
+                                                        <>Nenhum produto com {prod.search_prod_ids && prod.search_prod_ids.length > 1 ? 'os IDs' : 'o ID'} {prod.search_prod_ids?.join(', ')} ({prod.prod_title}) encontrado no estoque</>
+                                                    ) : (
+                                                        <>Não foi possível identificar um ID para o produto {prod.prod_title}</>
+                                                    )}
                                                 </p>
                                             </div>
                                         </div>

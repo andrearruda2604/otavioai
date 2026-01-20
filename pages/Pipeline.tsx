@@ -366,9 +366,16 @@ export default function PipelinePage() {
                         prod_title: rawProd.prod_title,
                         prod_price: undefined,
                         not_found: true,
-                        search_prod_ids: rawProd.search_prod_ids
+                        search_prod_ids: rawProd.search_prod_ids,
+                        has_search_ids: true // IDs exist but products not found
                     }]
-                    : [];
+                    : [{
+                        prod_id: rawProd.prod_id?.toString(),
+                        prod_title: rawProd.prod_title,
+                        prod_price: undefined,
+                        not_found: true,
+                        has_search_ids: false // No IDs at all
+                    }];
 
             console.log('orderedProds created:', orderedProds);
 
