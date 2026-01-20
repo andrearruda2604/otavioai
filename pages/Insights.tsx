@@ -90,6 +90,9 @@ export default function InsightsPage() {
     const [dateRange, setDateRange] = useState<DateRangeOption>('total');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+    const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+    const [selectedModel, setSelectedModel] = useState<string | null>(null);
+    const [selectedYear, setSelectedYear] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [rawData, setRawData] = useState<any[]>([]);
 
@@ -171,10 +174,21 @@ export default function InsightsPage() {
             return true; // 'all'
         });
 
-        // 2. Apply Product Filter (for brands, models, years only)
-        const filteredByProduct = selectedProduct
-            ? filtered.filter(item => item.prod_title === selectedProduct)
-            : filtered;
+        // 2. Apply Cascading Filters
+        let cascadedData = filtered;
+
+        if (selectedProduct) {
+            cascadedData = cascadedData.filter(item => item.prod_title === selectedProduct);
+        }
+        if (selectedBrand) {
+            cascadedData = cascadedData.filter(item => item.car_brand === selectedBrand);
+        }
+        if (selectedModel) {
+            cascadedData = cascadedData.filter(item => item.car_model === selectedModel);
+        }
+        if (selectedYear) {
+            cascadedData = cascadedData.filter(item => String(item.car_year) === selectedYear);
+        }
 
         // 3. Aggregate Data for Charts
         const aggregate = (data: any[], key: string, limit = 5): ChartData[] => {
@@ -194,13 +208,23 @@ export default function InsightsPage() {
                 .slice(0, limit);
         };
 
-        return {
-            products: aggregate(filtered, 'prod_title'), // No product filter for products chart
-            brands: aggregate(filteredByProduct, 'car_brand'), // Filtered by selected product
-            models: aggregate(filteredByProduct, 'car_model'), // Filtered by selected product
-            years: aggregate(filteredByProduct, 'car_year').sort((a, b) => Number(a.name) - Number(b.name)) // Filtered by selected product
+        // Apply filters excluding the current chart's filter
+        const getFilteredData = (excludeFilter: 'product' | 'brand' | 'model' | 'year') => {
+            let data = filtered;
+            if (excludeFilter !== 'product' && selectedProduct) data = data.filter(item => item.prod_title === selectedProduct);
+            if (excludeFilter !== 'brand' && selectedBrand) data = data.filter(item => item.car_brand === selectedBrand);
+            if (excludeFilter !== 'model' && selectedModel) data = data.filter(item => item.car_model === selectedModel);
+            if (excludeFilter !== 'year' && selectedYear) data = data.filter(item => String(item.car_year) === selectedYear);
+            return data;
         };
-    }, [rawData, statusFilter, selectedProduct]);
+
+        return {
+            products: aggregate(getFilteredData('product'), 'prod_title'),
+            brands: aggregate(getFilteredData('brand'), 'car_brand'),
+            models: aggregate(getFilteredData('model'), 'car_model'),
+            years: aggregate(getFilteredData('year'), 'car_year').sort((a, b) => Number(a.name) - Number(b.name))
+        };
+    }, [rawData, statusFilter, selectedProduct, selectedBrand, selectedModel, selectedYear]);
 
     // --- Render ---
 
@@ -239,9 +263,51 @@ export default function InsightsPage() {
         }
     };
 
-    // Clear product filter
-    const clearProductFilter = () => {
+    // Handle brand click
+    const handleBrandClick = (data: any) => {
+        let brandName: string | null = null;
+        if (data && data.activePayload && data.activePayload[0]) {
+            brandName = data.activePayload[0].payload.name;
+        } else if (data && data.activeLabel) {
+            brandName = data.activeLabel;
+        }
+        if (brandName) {
+            setSelectedBrand(prev => prev === brandName ? null : brandName);
+        }
+    };
+
+    // Handle model click
+    const handleModelClick = (data: any) => {
+        let modelName: string | null = null;
+        if (data && data.activePayload && data.activePayload[0]) {
+            modelName = data.activePayload[0].payload.name;
+        } else if (data && data.activeLabel) {
+            modelName = data.activeLabel;
+        }
+        if (modelName) {
+            setSelectedModel(prev => prev === modelName ? null : modelName);
+        }
+    };
+
+    // Handle year click
+    const handleYearClick = (data: any) => {
+        let yearName: string | null = null;
+        if (data && data.activePayload && data.activePayload[0]) {
+            yearName = data.activePayload[0].payload.name;
+        } else if (data && data.activeLabel) {
+            yearName = data.activeLabel;
+        }
+        if (yearName) {
+            setSelectedYear(prev => prev === yearName ? null : yearName);
+        }
+    };
+
+    // Clear all filters
+    const clearAllFilters = () => {
         setSelectedProduct(null);
+        setSelectedBrand(null);
+        setSelectedModel(null);
+        setSelectedYear(null);
     };
 
     return (
@@ -274,19 +340,51 @@ export default function InsightsPage() {
                     </div>
                 </div>
 
-                {/* Product Filter Indicator */}
-                {selectedProduct && (
-                    <div className="flex items-center gap-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-3 rounded-xl">
+                {/* Active Filters Indicator */}
+                {(selectedProduct || selectedBrand || selectedModel || selectedYear) && (
+                    <div className="flex flex-wrap items-center gap-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-3 rounded-xl">
                         <span className="material-icons-round text-purple-600 dark:text-purple-400 text-sm">filter_alt</span>
-                        <span className="text-sm font-medium text-purple-900 dark:text-purple-300">
-                            Filtrando por produto: <strong>{selectedProduct}</strong>
-                        </span>
+                        <span className="text-sm font-medium text-purple-900 dark:text-purple-300">Filtros ativos:</span>
+
+                        {selectedProduct && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-800/50 text-purple-900 dark:text-purple-200 text-xs font-medium rounded-md">
+                                Produto: {selectedProduct}
+                                <button onClick={() => setSelectedProduct(null)} className="hover:text-purple-700">
+                                    <span className="material-icons-round text-xs">close</span>
+                                </button>
+                            </span>
+                        )}
+                        {selectedBrand && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-100 dark:bg-emerald-800/50 text-emerald-900 dark:text-emerald-200 text-xs font-medium rounded-md">
+                                Marca: {selectedBrand}
+                                <button onClick={() => setSelectedBrand(null)} className="hover:text-emerald-700">
+                                    <span className="material-icons-round text-xs">close</span>
+                                </button>
+                            </span>
+                        )}
+                        {selectedModel && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-800/50 text-blue-900 dark:text-blue-200 text-xs font-medium rounded-md">
+                                Modelo: {selectedModel}
+                                <button onClick={() => setSelectedModel(null)} className="hover:text-blue-700">
+                                    <span className="material-icons-round text-xs">close</span>
+                                </button>
+                            </span>
+                        )}
+                        {selectedYear && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 dark:bg-amber-800/50 text-amber-900 dark:text-amber-200 text-xs font-medium rounded-md">
+                                Ano: {selectedYear}
+                                <button onClick={() => setSelectedYear(null)} className="hover:text-amber-700">
+                                    <span className="material-icons-round text-xs">close</span>
+                                </button>
+                            </span>
+                        )}
+
                         <button
-                            onClick={clearProductFilter}
+                            onClick={clearAllFilters}
                             className="ml-auto flex items-center gap-1 px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-lg transition-colors"
                         >
                             <span className="material-icons-round text-sm">close</span>
-                            Limpar
+                            Limpar Todos
                         </button>
                     </div>
                 )}
@@ -340,7 +438,13 @@ export default function InsightsPage() {
                     {/* 2. Por Marca */}
                     <ChartCard title="Por Marca">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={processedData.brands} margin={{ left: 20, right: 40 }}>
+                            <BarChart
+                                layout="vertical"
+                                data={processedData.brands}
+                                margin={{ left: 20, right: 40 }}
+                                onClick={handleBrandClick}
+                                style={{ cursor: 'pointer' }}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" hide />
                                 <YAxis
@@ -350,7 +454,14 @@ export default function InsightsPage() {
                                     tick={{ fontSize: 12, fill: '#64748b' }}
                                 />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="value" fill={COLORS.primary} radius={[0, 4, 4, 0]} barSize={24}>
+                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                                    {processedData.brands.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={selectedBrand === entry.name ? '#059669' : COLORS.primary}
+                                            opacity={selectedBrand === entry.name ? 1 : selectedBrand ? 0.4 : 1}
+                                        />
+                                    ))}
                                     <LabelList
                                         dataKey="value"
                                         position="right"
@@ -364,7 +475,13 @@ export default function InsightsPage() {
                     {/* 3. Por Modelo */}
                     <ChartCard title="Por Modelo">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart layout="vertical" data={processedData.models} margin={{ left: 20, right: 40 }}>
+                            <BarChart
+                                layout="vertical"
+                                data={processedData.models}
+                                margin={{ left: 20, right: 40 }}
+                                onClick={handleModelClick}
+                                style={{ cursor: 'pointer' }}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" hide />
                                 <YAxis
@@ -374,7 +491,14 @@ export default function InsightsPage() {
                                     tick={{ fontSize: 12, fill: '#64748b' }}
                                 />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="value" fill={COLORS.secondary} radius={[0, 4, 4, 0]} barSize={24}>
+                                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+                                    {processedData.models.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={selectedModel === entry.name ? '#1d4ed8' : COLORS.secondary}
+                                            opacity={selectedModel === entry.name ? 1 : selectedModel ? 0.4 : 1}
+                                        />
+                                    ))}
                                     <LabelList
                                         dataKey="value"
                                         position="right"
@@ -388,7 +512,12 @@ export default function InsightsPage() {
                     {/* 4. Por Ano */}
                     <ChartCard title="Por Ano">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={processedData.years} margin={{ top: 20, bottom: 5 }}>
+                            <BarChart
+                                data={processedData.years}
+                                margin={{ top: 20, bottom: 5 }}
+                                onClick={handleYearClick}
+                                style={{ cursor: 'pointer' }}
+                            >
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                 <XAxis
                                     dataKey="name"
@@ -398,7 +527,14 @@ export default function InsightsPage() {
                                 />
                                 <YAxis hide />
                                 <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="value" fill={COLORS.tertiary} radius={[4, 4, 0, 0]} barSize={40}>
+                                <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                                    {processedData.years.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={selectedYear === entry.name ? '#d97706' : COLORS.tertiary}
+                                            opacity={selectedYear === entry.name ? 1 : selectedYear ? 0.4 : 1}
+                                        />
+                                    ))}
                                     <LabelList
                                         dataKey="value"
                                         position="top"
