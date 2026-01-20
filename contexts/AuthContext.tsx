@@ -345,7 +345,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 });
             }
 
-            await new Promise(resolve => setTimeout(resolve, 1500)); // wait for trigger
+            await new Promise(resolve => setTimeout(resolve, 1000)); // wait for data to propagate
             await fetchAllUsers();
             return true;
         } catch { return false; }
