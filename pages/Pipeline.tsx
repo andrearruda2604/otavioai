@@ -360,11 +360,15 @@ export default function PipelinePage() {
                     supplier_name: sp.suppliers?.name,
                     supplier_domain: sp.suppliers?.apex_domain
                 }))
-                : [{
-                    prod_id: rawProd.prod_id?.toString(),
-                    prod_title: rawProd.prod_title,
-                    prod_price: undefined
-                }];
+                : (rawProd.search_prod_ids && rawProd.search_prod_ids.length > 0)
+                    ? [{
+                        prod_id: rawProd.prod_id?.toString(),
+                        prod_title: rawProd.prod_title,
+                        prod_price: undefined,
+                        not_found: true,
+                        search_prod_ids: rawProd.search_prod_ids
+                    }]
+                    : [];
 
             console.log('orderedProds created:', orderedProds);
 

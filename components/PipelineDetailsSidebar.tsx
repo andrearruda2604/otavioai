@@ -18,6 +18,9 @@ export interface PipelineRequest {
         stock_unit_price?: number;
         supplier_name?: string;
         supplier_domain?: string;
+        // Not found flag
+        not_found?: boolean;
+        search_prod_ids?: string[];
     }>;
     client?: {
         client_id?: number;
@@ -170,8 +173,8 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                         </div>
                     </div>
 
-                    {/* Produtos Section - Only show products with stock details */}
-                    {request.ordered_prods && request.ordered_prods.filter(p => p.stock_product_title).length > 0 && (
+                    {/* Produtos Section - Only show products with stock details OR not found message */}
+                    {request.ordered_prods && (request.ordered_prods.filter(p => p.stock_product_title).length > 0 || request.ordered_prods.some(p => p.not_found)) && (
                         <div>
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
                                 <span className="material-icons-round text-sm">shopping_bag</span>
@@ -241,6 +244,20 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                                 )}
                                             </div>
                                         )}
+                                    </div>
+                                ))}
+
+                                {/* Not found message */}
+                                {request.ordered_prods.filter(p => p.not_found).map((prod, idx) => (
+                                    <div key={`not-found-${idx}`} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                                        <div className="flex items-start gap-2">
+                                            <span className="material-icons-round text-amber-600 dark:text-amber-400 text-sm mt-0.5">warning</span>
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                                    Nenhum produto com {prod.search_prod_ids && prod.search_prod_ids.length > 1 ? 'os IDs' : 'o ID'} {prod.search_prod_ids?.join(', ')} ({prod.prod_title}) encontrado no estoque
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
