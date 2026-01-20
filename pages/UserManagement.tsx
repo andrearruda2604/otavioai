@@ -7,6 +7,8 @@ export default function UserManagementPage() {
     const [userModalOpen, setUserModalOpen] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [createdUserName, setCreatedUserName] = useState('');
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
 
     const {
         users,
@@ -60,6 +62,19 @@ export default function UserManagementPage() {
 
     const handleRoleChange = async (userId: string, newRoleId: string) => {
         return await updateUserRole(userId, newRoleId);
+    };
+
+    const handleDeleteClick = (userId: string, userName: string) => {
+        setUserToDelete({ id: userId, name: userName });
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (userToDelete) {
+            await deleteUser(userToDelete.id);
+            setDeleteModalOpen(false);
+            setUserToDelete(null);
+        }
     };
 
     const filteredUsers = showDeleted
@@ -186,7 +201,7 @@ export default function UserManagementPage() {
                                                 onApprove={isManager && userItem.status === 'Pendente' ? () => approveUser(userItem.id) : undefined}
                                                 onDeactivate={() => updateUserStatus(userItem.id, 'Inativo')}
                                                 onActivate={() => updateUserStatus(userItem.id, 'Ativo')}
-                                                onDelete={() => deleteUser(userItem.id)}
+                                                onDelete={() => handleDeleteClick(userItem.id, userItem.name)}
                                                 onRestore={() => restoreUser(userItem.id)}
                                             />
                                         </td>
@@ -227,6 +242,42 @@ export default function UserManagementPage() {
                             >
                                 OK
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteModalOpen && userToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteModalOpen(false)}></div>
+                    <div className="relative bg-white dark:bg-card-dark rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                        <div className="p-8 text-center">
+                            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="material-icons-round text-red-600 dark:text-red-400 text-4xl">warning</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                                Confirmar exclusão
+                            </h3>
+                            <p className="text-slate-600 dark:text-slate-400 mb-6">
+                                Tem certeza que deseja excluir o usuário <strong>{userToDelete.name}</strong>?
+                                <br />
+                                <span className="text-sm">Esta ação pode ser revertida posteriormente.</span>
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setDeleteModalOpen(false)}
+                                    className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+                                >
+                                    Excluir
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
