@@ -323,26 +323,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const role = roles.find(r => r.id === roleId);
 
             // Get current session to restore after signup
-            const { data: { session: currentSession } } = await supabase.auth.getSession();
-
-            // Create user with signUp (this will auto-login the new user)
-            const { error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: { name, role: role?.name || 'tecnico' },
-                    emailRedirectTo: undefined // Prevent email confirmation redirect
-                }
+            // Call serverless function to create user using Admin API
+            const response = await fetch('/api/create-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password, name, roleId })
             });
-
-            if (error) return false;
-
-            // Immediately restore the admin session
-            if (currentSession) {
-                await supabase.auth.setSession({
-                    access_token: currentSession.access_token,
-                    refresh_token: currentSession.refresh_token
-                });
+            if (!response.ok) {
+                const error = await response.json();
+                console.error('Error creating user:', error);
+                return false;
             }
 
             await new Promise(resolve => setTimeout(resolve, 1000)); // wait for data to propagate
