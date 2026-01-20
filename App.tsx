@@ -44,7 +44,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     const location = useLocation();
     const { user, logout, userPermissions } = useAuth();
     const isActive = (path: string) => location.pathname === path;
-    const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
+    const [isDark, setIsDark] = useState(false);
 
     const toggleDarkMode = () => {
         const isCurrentlyDark = document.documentElement.classList.contains('dark');
