@@ -111,6 +111,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             setUser(userData);
             const permissions = await fetchUserPermissions(userData.role_id);
+            console.log('AuthContext: Loading user', userData.email, 'Role:', userData.roleName);
+            console.log('AuthContext: Permissions loaded:', permissions);
             setUserPermissions(permissions);
 
             // Lazy load users/roles only if needed (e.g., admin)
