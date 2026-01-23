@@ -400,7 +400,7 @@ export default function InsightsPage() {
 
                     {/* 1. Principais Produtos */}
                     <ChartCard title="Principais Produtos">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart
                                 layout="vertical"
                                 data={processedData.products}
@@ -437,7 +437,7 @@ export default function InsightsPage() {
 
                     {/* 2. Por Marca */}
                     <ChartCard title="Por Marca">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart
                                 layout="vertical"
                                 data={processedData.brands}
@@ -474,7 +474,7 @@ export default function InsightsPage() {
 
                     {/* 3. Por Modelo */}
                     <ChartCard title="Por Modelo">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart
                                 layout="vertical"
                                 data={processedData.models}
@@ -511,7 +511,7 @@ export default function InsightsPage() {
 
                     {/* 4. Por Ano */}
                     <ChartCard title="Por Ano">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart
                                 data={processedData.years}
                                 margin={{ top: 20, bottom: 5 }}
