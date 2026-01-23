@@ -27,6 +27,29 @@ export interface RolePermission {
     route_key: string;
 }
 
+// Permissões padrão para usuário sem role (apenas dashboard)
+export const defaultPermissions: string[] = ['dashboard'];
+
+export interface MenuPermissions {
+    dashboard: boolean;
+    insights: boolean;
+    pipeline: boolean;
+    chat: boolean;
+    leads: boolean;
+    knowledge: boolean;
+    users: boolean;
+}
+
+export const menuItems = [
+    { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', category: 'Geral' },
+    { key: 'insights', label: 'Insights', icon: 'insights', category: 'Geral' },
+    { key: 'pipeline', label: 'Pipeline', icon: 'account_tree', category: 'Vendas' },
+    { key: 'chat', label: 'Chat', icon: 'chat', category: 'Vendas' },
+    { key: 'leads', label: 'Leads', icon: 'people', category: 'Vendas' },
+    { key: 'knowledge', label: 'Base de Conhecimento', icon: 'menu_book', category: 'Recursos' },
+    { key: 'users', label: 'Gestão de Usuários', icon: 'manage_accounts', category: 'Administração' },
+];
+
 export interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
@@ -48,7 +71,8 @@ export interface AuthContextType {
     approveUser: (userId: string) => Promise<boolean>;
     refreshUsers: () => Promise<void>;
     refreshRoles: () => Promise<void>;
+    createRole: (name: string, description: string, permissions: MenuPermissions) => Promise<boolean>;
+    updateRole: (roleId: string, name: string, description: string, permissions: MenuPermissions) => Promise<boolean>;
+    deleteRole: (roleId: string) => Promise<boolean>;
+    getRolePermissions: (roleId: string) => Promise<MenuPermissions>;
 }
-
-// Permissões padrão para usuário sem role (apenas dashboard)
-export const defaultPermissions: string[] = ['dashboard'];

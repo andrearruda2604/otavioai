@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { User, Role, AuthContextType, UserStatus, defaultPermissions } from '../types/authTypes';
+import { User, Role, AuthContextType, UserStatus, defaultPermissions, MenuPermissions } from '../types/authTypes';
 
 // Dados mockados para fallback
 const mockUsers: User[] = [
@@ -401,6 +401,133 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const refreshUsers = async () => { await fetchAllUsers(); };
     const refreshRoles = async () => { await fetchRoles(); };
 
+    const createRole = async (name: string, description: string, permissions: MenuPermissions): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            const newRole: Role = {
+                id: String(roles.length + 1),
+                name,
+                description,
+                isSystem: false,
+                createdAt: new Date().toISOString()
+            };
+            setRoles([...roles, newRole]);
+            return true;
+        }
+
+        try {
+            const { data: roleData, error: roleError } = await supabase
+                .from('roles')
+                .insert({ name, description, is_system: false })
+                .select()
+                .single();
+
+            if (roleError || !roleData) throw roleError;
+
+            const permissionsToInsert = Object.entries(permissions)
+                .filter(([_, enabled]) => enabled)
+                .map(([key]) => ({
+                    role_id: roleData.id,
+                    route_key: key
+                }));
+
+            if (permissionsToInsert.length > 0) {
+                const { error: permError } = await supabase
+                    .from('role_permissions')
+                    .insert(permissionsToInsert);
+
+                if (permError) throw permError;
+            }
+
+            await fetchRoles();
+            return true;
+        } catch (err) {
+            console.error('Error creating role:', err);
+            return false;
+        }
+    };
+
+    const updateRole = async (roleId: string, name: string, description: string, permissions: MenuPermissions): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setRoles(roles.map(r => r.id === roleId ? { ...r, name, description } : r));
+            return true;
+        }
+
+        try {
+            const { error: roleError } = await supabase
+                .from('roles')
+                .update({ name, description })
+                .eq('id', roleId);
+
+            if (roleError) throw roleError;
+
+            // Delete old permissions
+            const { error: delError } = await supabase
+                .from('role_permissions')
+                .delete()
+                .eq('role_id', roleId);
+
+            if (delError) throw delError;
+
+            const permissionsToInsert = Object.entries(permissions)
+                .filter(([_, enabled]) => enabled)
+                .map(([key]) => ({
+                    role_id: roleId,
+                    route_key: key
+                }));
+
+            if (permissionsToInsert.length > 0) {
+                const { error: permError } = await supabase
+                    .from('role_permissions')
+                    .insert(permissionsToInsert);
+
+                if (permError) throw permError;
+            }
+
+            await fetchRoles();
+            return true;
+        } catch (err) {
+            console.error('Error updating role:', err);
+            return false;
+        }
+    };
+
+    const deleteRole = async (roleId: string): Promise<boolean> => {
+        if (!isSupabaseConfigured()) {
+            setRoles(roles.filter(r => r.id !== roleId));
+            return true;
+        }
+        try {
+            const { error } = await supabase.from('roles').delete().eq('id', roleId);
+            if (error) throw error;
+            await fetchRoles();
+            return true;
+        } catch (err) {
+            console.error('Error deleting role:', err);
+            return false;
+        }
+    };
+
+    const getRolePermissions = async (roleId: string): Promise<MenuPermissions> => {
+        const permissions: MenuPermissions = {
+            dashboard: false,
+            insights: false,
+            pipeline: false,
+            chat: false,
+            leads: false,
+            knowledge: false,
+            users: false
+        };
+
+        const keys = await fetchUserPermissions(roleId);
+        keys.forEach(key => {
+            if (key in permissions) {
+                (permissions as any)[key] = true;
+            }
+        });
+
+        return permissions;
+    };
+
     const value: AuthContextType = {
         user,
         isAuthenticated: !!user,
@@ -422,6 +549,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         approveUser,
         refreshUsers,
         refreshRoles,
+        createRole,
+        updateRole,
+        deleteRole,
+        getRolePermissions,
     };
 
     if (loading) {
