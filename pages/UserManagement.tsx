@@ -402,7 +402,9 @@ export default function UserManagementPage() {
                                         <td className="px-6 py-4">
                                             <ActionMenu
                                                 onEdit={() => handleEditProfile(role)}
+                                                editLabel="Editar Perfil"
                                                 onDelete={!role.isSystem ? () => handleDeleteProfileClick(role.id, role.name) : undefined}
+                                                deleteLabel="Excluir Perfil"
                                             />
                                         </td>
                                     </tr>
