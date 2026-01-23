@@ -403,7 +403,7 @@ export default function UserManagementPage() {
                                             <ActionMenu
                                                 onEdit={() => handleEditProfile(role)}
                                                 editLabel="Editar Perfil"
-                                                onDelete={!role.isSystem ? () => handleDeleteProfileClick(role.id, role.name) : undefined}
+                                                onDelete={() => handleDeleteProfileClick(role.id, role.name)}
                                                 deleteLabel="Excluir Perfil"
                                             />
                                         </td>

@@ -115,10 +115,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.log('AuthContext: Permissions loaded:', permissions);
             setUserPermissions(permissions);
 
-            // Lazy load users/roles only if needed (e.g., admin)
-            // Or render optimization: load in background without blocking UI
-            // For now, keep async but don't await blocking `loading` false
-            if (profile.roles?.name === 'admin' || profile.roles?.name === 'gerente') {
+            // Lazy load users/roles if has permission
+            if (permissions.includes('users')) {
                 fetchAllUsers();
                 fetchRoles();
             }
@@ -217,10 +215,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, []);
 
     useEffect(() => {
-        if (user && (user.roleName === 'admin' || user.roleName === 'gerente')) {
+        // Fetch users if user has specific permission, not just hardcoded roles
+        if (user && userPermissions.includes('users')) {
             fetchAllUsers();
+            fetchRoles();
         }
-    }, [showDeleted, user?.roleName]);
+    }, [showDeleted, user, userPermissions]);
 
     const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
         if (!isSupabaseConfigured()) {
