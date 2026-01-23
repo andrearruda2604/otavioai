@@ -193,14 +193,14 @@ function AppContent() {
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const publicRoutes = ['/login', '/signup'];
+    const publicRoutes = ['/login', '/signup', '/forgot-password', '/update-password'];
     const isPublicRoute = publicRoutes.includes(location.pathname);
 
     if (!isAuthenticated && !isPublicRoute) {
         return <Navigate to="/login" replace />;
     }
 
-    if (isAuthenticated && isPublicRoute) {
+    if (isAuthenticated && isPublicRoute && location.pathname !== '/update-password') {
         return <Navigate to="/dashboard" replace />;
     }
 
