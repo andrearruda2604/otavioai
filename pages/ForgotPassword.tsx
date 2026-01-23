@@ -16,7 +16,7 @@ export default function ForgotPasswordPage() {
         setLoading(true);
 
         try {
-            const result = await resetPassword(email);
+            const result = await resetPassword(email.trim());
             if (result.success) {
                 setMessage('Verifique seu email para instruções de redefinição de senha.');
             } else {

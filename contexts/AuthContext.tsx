@@ -536,7 +536,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         try {
             // Redirect to the update-password page
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
                 redirectTo: `${window.location.origin}/#/update-password`,
             });
             if (error) throw error;
