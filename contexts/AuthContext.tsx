@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { User, Role, AuthContextType, UserStatus, defaultPermissions, MenuPermissions } from '../types/authTypes';
 
@@ -29,6 +30,7 @@ const mockPermissions: Record<string, string[]> = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const navigate = useNavigate();
     const [user, setUser] = useState<User | null>(null);
     const [users, setUsers] = useState<User[]>([]);
     const [roles, setRoles] = useState<Role[]>(mockRoles);
@@ -207,8 +209,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             handleSession(session);
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             handleSession(session);
+            if (event === 'PASSWORD_RECOVERY') {
+                navigate('/update-password');
+            }
         });
 
         return () => subscription.unsubscribe();
@@ -537,7 +542,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             // Redirect to the update-password page
             const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-                redirectTo: `${window.location.origin}/#/update-password`,
+                redirectTo: window.location.origin,
             });
             if (error) throw error;
             return { success: true, message: 'Email de recuperação enviado.' };
