@@ -400,24 +400,10 @@ export default function UserManagementPage() {
                                             {role.description}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleEditProfile(role)}
-                                                    className="p-1 text-slate-400 hover:text-blue-500 transition-colors"
-                                                    title="Editar"
-                                                >
-                                                    <span className="material-icons-round">edit</span>
-                                                </button>
-                                                {!role.isSystem && (
-                                                    <button
-                                                        onClick={() => handleDeleteProfileClick(role.id, role.name)}
-                                                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                                                        title="Excluir"
-                                                    >
-                                                        <span className="material-icons-round">delete</span>
-                                                    </button>
-                                                )}
-                                            </div>
+                                            <ActionMenu
+                                                onEdit={() => handleEditProfile(role)}
+                                                onDelete={!role.isSystem ? () => handleDeleteProfileClick(role.id, role.name) : undefined}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
