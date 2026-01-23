@@ -530,6 +530,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return permissions;
     };
 
+    const resetPassword = async (email: string): Promise<{ success: boolean; message: string }> => {
+        if (!isSupabaseConfigured()) {
+            return { success: true, message: 'Email de recuperação enviado (simulação).' };
+        }
+        try {
+            // Redirect to the update-password page
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: `${window.location.origin}/#/update-password`,
+            });
+            if (error) throw error;
+            return { success: true, message: 'Email de recuperação enviado.' };
+        } catch (err: any) {
+            return { success: false, message: err.message || 'Erro ao enviar email.' };
+        }
+    };
+
+    const updatePassword = async (password: string): Promise<{ success: boolean; message: string }> => {
+        if (!isSupabaseConfigured()) {
+            return { success: true, message: 'Senha atualizada com sucesso (simulação).' };
+        }
+        try {
+            const { error } = await supabase.auth.updateUser({ password });
+            if (error) throw error;
+            return { success: true, message: 'Senha atualizada com sucesso.' };
+        } catch (err: any) {
+            return { success: false, message: err.message || 'Erro ao atualizar senha.' };
+        }
+    };
+
     const value: AuthContextType = {
         user,
         isAuthenticated: !!user,
@@ -555,6 +584,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateRole,
         deleteRole,
         getRolePermissions,
+        resetPassword,
+        updatePassword,
     };
 
     if (loading) {

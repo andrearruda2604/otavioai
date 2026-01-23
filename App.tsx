@@ -13,6 +13,8 @@ import KnowledgePage from './pages/Knowledge';
 import LoginPage from './pages/Login';
 import SignupPage from './pages/Signup';
 import UserManagementPage from './pages/UserManagement';
+import ForgotPasswordPage from './pages/ForgotPassword';
+import UpdatePasswordPage from './pages/UpdatePassword';
 
 const MobileHeader = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const { user } = useAuth();
@@ -207,6 +209,8 @@ function AppContent() {
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignupPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/update-password" element={<UpdatePasswordPage />} />
             </Routes>
         );
     }

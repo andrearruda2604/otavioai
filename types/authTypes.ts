@@ -75,4 +75,6 @@ export interface AuthContextType {
     updateRole: (roleId: string, name: string, description: string, permissions: MenuPermissions) => Promise<boolean>;
     deleteRole: (roleId: string) => Promise<boolean>;
     getRolePermissions: (roleId: string) => Promise<MenuPermissions>;
+    resetPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+    updatePassword: (password: string) => Promise<{ success: boolean; message: string }>;
 }
