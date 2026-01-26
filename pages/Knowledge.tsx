@@ -2,13 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-interface CompanyUrls {
-    site_url: string;
-    instagram_url: string;
-    facebook_url: string;
-    linkedin_url: string;
-}
-
 interface UploadedFile {
     id: string;
     name: string;
@@ -22,16 +15,8 @@ export default function KnowledgePage() {
     const { user } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const [urls, setUrls] = useState<CompanyUrls>({
-        site_url: '',
-        instagram_url: '',
-        facebook_url: '',
-        linkedin_url: ''
-    });
     const [files, setFiles] = useState<UploadedFile[]>([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [message, setMessage] = useState('');
     const [isDragging, setIsDragging] = useState(false);
 
     useEffect(() => {
@@ -42,21 +27,6 @@ export default function KnowledgePage() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            // Fetch URLs from ai_settings or a dedicated table
-            const { data: settingsData } = await supabase
-                .from('ai_settings')
-                .select('*')
-                .eq('user_id', user?.id)
-                .single();
-
-            if (settingsData) {
-                setUrls({
-                    site_url: settingsData.site_url || '',
-                    instagram_url: settingsData.instagram_url || '',
-                    facebook_url: settingsData.facebook_url || '',
-                    linkedin_url: settingsData.linkedin_url || ''
-                });
-            }
 
             // Fetch uploaded files from storage or a files table
             const { data: filesData } = await supabase
@@ -79,28 +49,6 @@ export default function KnowledgePage() {
             console.error('Error fetching knowledge data:', error);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleSaveUrls = async () => {
-        setSaving(true);
-        setMessage('');
-
-        try {
-            const { error } = await supabase.from('ai_settings').upsert({
-                user_id: user?.id,
-                ...urls,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-
-            if (error) throw error;
-            setMessage('URLs salvas com sucesso!');
-            setTimeout(() => setMessage(''), 3000);
-        } catch (error) {
-            console.error('Error saving URLs:', error);
-            setMessage('Erro ao salvar URLs.');
-        } finally {
-            setSaving(false);
         }
     };
 
@@ -227,85 +175,6 @@ export default function KnowledgePage() {
                 <h2 className="text-3xl font-bold dark:text-white">Base de Conhecimento</h2>
                 <p className="text-slate-500 dark:text-slate-400 mt-1">Configure as informações da sua empresa para o agente</p>
             </header>
-
-            {/* URLs Section */}
-            <section className="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <h3 className="text-lg font-bold dark:text-white mb-2">URLs da Empresa</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Adicione os links das redes sociais e site da sua empresa</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            <span className="material-icons-round text-slate-400 text-lg">language</span>
-                            Site Institucional
-                        </label>
-                        <input
-                            type="url"
-                            value={urls.site_url}
-                            onChange={(e) => setUrls({ ...urls, site_url: e.target.value })}
-                            placeholder="https://www.suaempresa.com.br"
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            <span className="material-icons-round text-pink-500 text-lg">photo_camera</span>
-                            Instagram
-                        </label>
-                        <input
-                            type="url"
-                            value={urls.instagram_url}
-                            onChange={(e) => setUrls({ ...urls, instagram_url: e.target.value })}
-                            placeholder="https://instagram.com/suaempresa"
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            <span className="material-icons-round text-blue-600 text-lg">facebook</span>
-                            Facebook
-                        </label>
-                        <input
-                            type="url"
-                            value={urls.facebook_url}
-                            onChange={(e) => setUrls({ ...urls, facebook_url: e.target.value })}
-                            placeholder="https://facebook.com/suaempresa"
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            <span className="material-icons-round text-blue-700 text-lg">business</span>
-                            LinkedIn
-                        </label>
-                        <input
-                            type="url"
-                            value={urls.linkedin_url}
-                            onChange={(e) => setUrls({ ...urls, linkedin_url: e.target.value })}
-                            placeholder="https://linkedin.com/company/suaempresa"
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:outline-none dark:text-white"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-4 mt-6">
-                    {message && (
-                        <span className={`text-sm ${message.includes('Erro') ? 'text-rose-500' : 'text-emerald-500'} font-medium`}>
-                            {message}
-                        </span>
-                    )}
-                    <button
-                        onClick={handleSaveUrls}
-                        disabled={saving}
-                        className="px-6 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors disabled:opacity-70 flex items-center gap-2"
-                    >
-                        {saving ? 'Salvando...' : 'Salvar URLs'}
-                    </button>
-                </div>
-            </section>
 
             {/* Files Section */}
             <section className="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">

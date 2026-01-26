@@ -32,36 +32,36 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable all access for authenticated users" ON chats FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "Enable all access for authenticated users" ON messages FOR ALL USING (auth.role() = 'authenticated');
 
--- 5. Create ai_settings table
-CREATE TABLE IF NOT EXISTS ai_settings (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE, -- One setting per user (store)
-    max_discount_margin INTEGER DEFAULT 10,
-    tone_of_voice TEXT DEFAULT 'friendly', -- 'friendly' | 'technical'
-    system_prompt TEXT DEFAULT '',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- 5. Create ai_settings table (DEPRECATED)
+-- CREATE TABLE IF NOT EXISTS ai_settings (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE, -- One setting per user (store)
+--     max_discount_margin INTEGER DEFAULT 10,
+--     tone_of_voice TEXT DEFAULT 'friendly', -- 'friendly' | 'technical'
+--     system_prompt TEXT DEFAULT '',
+--     created_at TIMESTAMPTZ DEFAULT NOW(),
+--     updated_at TIMESTAMPTZ DEFAULT NOW()
+-- );
 
--- 6. RLS Policies for ai_settings
-ALTER TABLE ai_settings ENABLE ROW LEVEL SECURITY;
+-- 6. RLS Policies for ai_settings (DEPRECATED)
+-- ALTER TABLE ai_settings ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist to prevent errors on re-run
-DROP POLICY IF EXISTS "Users can view their own settings" ON ai_settings;
-DROP POLICY IF EXISTS "Users can update their own settings" ON ai_settings;
-DROP POLICY IF EXISTS "Users can insert their own settings" ON ai_settings;
+-- DROP POLICY IF EXISTS "Users can view their own settings" ON ai_settings;
+-- DROP POLICY IF EXISTS "Users can update their own settings" ON ai_settings;
+-- DROP POLICY IF EXISTS "Users can insert their own settings" ON ai_settings;
 
-CREATE POLICY "Users can view their own settings"
-    ON ai_settings FOR SELECT
-    USING (auth.uid() = user_id);
+-- CREATE POLICY "Users can view their own settings"
+--     ON ai_settings FOR SELECT
+--     USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can update their own settings"
-    ON ai_settings FOR UPDATE
-    USING (auth.uid() = user_id);
+-- CREATE POLICY "Users can update their own settings"
+--     ON ai_settings FOR UPDATE
+--     USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can insert their own settings"
-    ON ai_settings FOR INSERT
-    WITH CHECK (auth.uid() = user_id);
+-- CREATE POLICY "Users can insert their own settings"
+--     ON ai_settings FOR INSERT
+--     WITH CHECK (auth.uid() = user_id);
 
 -- 7. Insert Mock Data for Chats/messages if empty
 INSERT INTO chats (contact_name, company_name, is_ai_enabled)

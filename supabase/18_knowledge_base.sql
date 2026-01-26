@@ -1,12 +1,12 @@
 -- Migration: Add Knowledge Base Support
 -- This adds URL columns to ai_settings and creates the knowledge_files table
 
--- 1. Add URL columns to ai_settings table
-ALTER TABLE ai_settings 
-ADD COLUMN IF NOT EXISTS site_url TEXT,
-ADD COLUMN IF NOT EXISTS instagram_url TEXT,
-ADD COLUMN IF NOT EXISTS facebook_url TEXT,
-ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
+-- 1. Add URL columns to ai_settings table (DEPRECATED: Table removed)
+-- ALTER TABLE ai_settings 
+-- ADD COLUMN IF NOT EXISTS site_url TEXT,
+-- ADD COLUMN IF NOT EXISTS instagram_url TEXT,
+-- ADD COLUMN IF NOT EXISTS facebook_url TEXT,
+-- ADD COLUMN IF NOT EXISTS linkedin_url TEXT;
 
 -- 2. Create knowledge_files table for document storage metadata
 CREATE TABLE IF NOT EXISTS knowledge_files (
