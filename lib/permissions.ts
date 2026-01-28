@@ -1,4 +1,3 @@
-// Mapeamento de rotas para chaves de permissão
 export const ROUTE_PERMISSIONS: Record<string, string> = {
     '/dashboard': 'dashboard',
     '/insights': 'insights',
@@ -9,7 +8,6 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
     '/users': 'users',
 };
 
-// Todas as permissões disponíveis (para UI de gestão)
 export const ALL_PERMISSIONS = [
     { key: 'dashboard', label: 'Dashboard', group: 'Geral', icon: 'dashboard' },
     { key: 'insights', label: 'Insights', group: 'Geral', icon: 'insights' },
@@ -20,12 +18,6 @@ export const ALL_PERMISSIONS = [
     { key: 'users', label: 'Gestão de Usuários', group: 'Administração', icon: 'manage_accounts' },
 ] as const;
 
-/**
- * Verifica se usuário pode acessar uma rota
- * @param userPermissions Lista de route_keys que o usuário tem permissão
- * @param routePath Caminho da rota a verificar
- * @returns true se pode acessar, false caso contrário
- */
 export function canAccessRoute(userPermissions: string[] | null | undefined, routePath: string): boolean {
     if (!userPermissions || userPermissions.length === 0) return false;
 
@@ -46,23 +38,11 @@ export function canAccessRoute(userPermissions: string[] | null | undefined, rou
     return userPermissions.includes(matchedKey);
 }
 
-/**
- * Verifica se usuário tem uma permissão específica
- * @param userPermissions Lista de route_keys que o usuário tem permissão
- * @param permissionKey Chave da permissão a verificar
- * @returns true se tem permissão, false caso contrário
- */
 export function hasPermission(userPermissions: string[] | null | undefined, permissionKey: string): boolean {
     if (!userPermissions) return false;
     return userPermissions.includes(permissionKey);
 }
 
-/**
- * Filtra itens de navegação baseado em permissões
- * @param navItems Lista de itens de navegação
- * @param userPermissions Lista de route_keys que o usuário tem permissão
- * @returns Lista filtrada de itens de navegação
- */
 export function filterNavigation<T extends { path: string }>(
     navItems: T[],
     userPermissions: string[] | null | undefined

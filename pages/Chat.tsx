@@ -2,48 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-
-// N8N Message Structure
-interface N8NMessageContent {
-    type: 'ai' | 'human' | 'system';
-    content: string;
-    tool_calls?: any[];
-}
-
-interface Message {
-    id: number;
-    session_id: string;
-    message: N8NMessageContent;
-    created_at?: string;
-}
-
-interface ClientSession {
-    client_id: string;
-    name_first: string;
-    name_last: string;
-    whatsapp: string;
-    last_message?: string;
-    fup_done?: boolean;
-    company_name?: string;
-    archived?: boolean;
-    requests?: { status: string; created_at: string }[];
-    latestStatus?: string; // Derived
-}
-
-// Stat Card Component (inline for simplicity)
-const ChatStatCard = ({ title, value, icon, color }: { title: string; value: string; icon: string; color: string }) => (
-    <div className="bg-white dark:bg-card-dark p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex-1 min-w-[200px]">
-        <div className="flex items-center justify-between">
-            <div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{title}</p>
-                <p className="text-3xl font-bold text-slate-800 dark:text-white">{value}</p>
-            </div>
-            <div className={`w-10 h-10 rounded-xl bg-${color}-50 dark:bg-${color}-900/20 text-${color}-500 flex items-center justify-center`}>
-                <span className="material-icons-round">{icon}</span>
-            </div>
-        </div>
-    </div>
-);
+import { ChatStatCard } from '../components/ChatStatCard';
+import { Message, ClientSession } from '../types/chat';
 
 export default function ChatPage() {
     const { user } = useAuth();

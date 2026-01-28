@@ -4,15 +4,22 @@
 -- ============================================
 
 -- Função que cria o perfil automaticamente ao criar usuário
+-- Função que cria o perfil automaticamente ao criar usuário
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+    role_record RECORD;
 BEGIN
-    INSERT INTO public.profiles (id, name, role, status)
+    -- Busca o ID do papel 'usuario' (padrão)
+    SELECT id INTO role_record FROM public.roles WHERE name = 'usuario' LIMIT 1;
+
+    INSERT INTO public.profiles (id, name, email, role_id, status)
     VALUES (
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-        COALESCE(NEW.raw_user_meta_data->>'role', 'tecnico'),
-        'Ativo'
+        NEW.email,
+        role_record.id,
+        'Ativo' -- Cria como ativo para facilitar teste, ou 'Pendente' se quiser aprovação
     );
     RETURN NEW;
 END;

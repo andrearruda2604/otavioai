@@ -11,19 +11,8 @@ import {
 } from 'recharts';
 import { StatCard } from '../components/StatCard';
 import { InteractionItem } from '../components/InteractionItem';
+import { CategoryBar } from '../components/CategoryBar';
 import { supabase } from '../lib/supabase';
-
-const CategoryBar: React.FC<{ label: string; percent: number; color: string }> = ({ label, percent, color }) => (
-    <div>
-        <div className="flex justify-between mb-2">
-            <span className="text-sm font-medium dark:text-slate-300">{label}</span>
-            <span className="text-sm font-bold dark:text-slate-200">{percent}%</span>
-        </div>
-        <div className="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-            <div className={`${color} h-full`} style={{ width: `${percent}%` }}></div>
-        </div>
-    </div>
-);
 
 export default function DashboardPage() {
     const navigate = useNavigate();
@@ -163,19 +152,22 @@ export default function DashboardPage() {
                 setChartData(Array.from(daysMap.values()));
 
                 // 3. Recent Interactions
-                const recent = requests.slice(0, 5).map(r => ({
-                    initials: r.clients?.name_first?.substring(0, 2).toUpperCase() || 'CL',
-                    name: `${r.clients?.name_first || 'Cliente'} ${r.clients?.name_last || ''}`,
-                    action: r.status?.toLowerCase().includes('deal') ? 'fechou pedido' : 'solicitou',
-                    item: Array.isArray(r.ordered_prods) && r.ordered_prods[0]?.prod_title
-                        ? r.ordered_prods[0].prod_title
-                        : (Array.isArray(r.ordered_prods) ? `${r.ordered_prods.length} itens` : 'Cotação'),
-                    time: new Date(r.created_at).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
-                    company: r.clients?.company_name || 'Particular',
-                    status: r.status || 'Pendente',
-                    statusColor: r.status?.toLowerCase().includes('deal') ? 'green' : (r.status?.toLowerCase().includes('cancel') ? 'red' : 'orange'),
-                    clientId: r.client_id
-                }));
+                const recent = requests.slice(0, 5).map(r => {
+                    const client = Array.isArray(r.clients) ? r.clients[0] : r.clients;
+                    return {
+                        initials: client?.name_first?.substring(0, 2).toUpperCase() || 'CL',
+                        name: `${client?.name_first || 'Cliente'} ${client?.name_last || ''}`,
+                        action: r.status?.toLowerCase().includes('deal') ? 'fechou pedido' : 'solicitou',
+                        item: Array.isArray(r.ordered_prods) && r.ordered_prods[0]?.prod_title
+                            ? r.ordered_prods[0].prod_title
+                            : (Array.isArray(r.ordered_prods) ? `${r.ordered_prods.length} itens` : 'Cotação'),
+                        time: new Date(r.created_at).toLocaleString('pt-BR', { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+                        company: client?.company_name || 'Particular',
+                        status: r.status || 'Pendente',
+                        statusColor: r.status?.toLowerCase().includes('deal') ? 'green' : (r.status?.toLowerCase().includes('cancel') ? 'red' : 'orange'),
+                        clientId: r.client_id
+                    };
+                });
                 setInteractions(recent);
             }
 
@@ -207,8 +199,7 @@ export default function DashboardPage() {
                 setBrandStats([]);
             }
 
-        } catch (error) {
-            console.error('Error fetching dashboard:', error);
+        } catch {
         } finally {
             setLoading(false);
         }

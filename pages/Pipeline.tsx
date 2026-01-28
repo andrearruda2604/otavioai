@@ -1,32 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { KanbanCardData } from '../types';
-import { PipelineDetailsSidebar, PipelineRequest } from '../components/PipelineDetailsSidebar';
-
-// --- Types & Components ---
-
-type DateRangeOption = 'today' | '7days' | '30days' | 'month' | 'total';
-type VerificationFilter = 'all' | 'verified' | 'unverified';
-
-const FilterButton = ({
-    active,
-    onClick,
-    label
-}: {
-    active: boolean;
-    onClick: () => void;
-    label: string;
-}) => (
-    <button
-        onClick={onClick}
-        className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${active
-            ? 'bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-            }`}
-    >
-        {label}
-    </button>
-);
+import { PipelineDetailsSidebar } from '../components/PipelineDetailsSidebar';
+import { FilterButton } from '../components/FilterButton';
+import { DateRangeOption, VerificationFilter, PipelineRequest } from '../types/pipeline';
 
 interface KanbanColumnProps {
     title: string;
@@ -301,25 +278,19 @@ export default function PipelinePage() {
             });
 
             setColumns(newColumns);
-        } catch (error) {
-            console.error('Error fetching pipeline:', error);
+        } catch {
         } finally {
             setLoading(false);
         }
     };
 
     const handleCardClick = async (card: KanbanCardData) => {
-        // Find the full raw product data
         const rawProd = rawProducts.find((p: any) => p.prod_id.toString() === card.id);
-        console.log('Raw product data:', rawProd);
 
         if (rawProd) {
-            // Fetch stock products if search_prod_ids exists
             let stockProducts: any[] = [];
-            console.log('search_prod_ids:', rawProd.search_prod_ids);
 
             if (rawProd.search_prod_ids && rawProd.search_prod_ids.length > 0) {
-                console.log('Fetching stock products for IDs:', rawProd.search_prod_ids);
 
                 const { data: stockData, error: stockError } = await supabase
                     .from('stock_products')
@@ -338,22 +309,16 @@ export default function PipelinePage() {
                     .in('product_id', rawProd.search_prod_ids.map((id: string) => parseInt(id)));
 
                 if (stockError) {
-                    console.error('Error fetching stock products:', stockError);
                 }
 
                 stockProducts = stockData || [];
-                console.log('Stock products found:', stockProducts.length, stockProducts);
             }
-
-            console.log('stockProducts.length:', stockProducts.length);
-            console.log('Will use fallback?', stockProducts.length === 0);
 
             const orderedProds = stockProducts.length > 0
                 ? stockProducts.map((sp: any) => ({
                     prod_id: sp.product_id?.toString(),
-                    prod_title: rawProd.prod_title, // Title from request
-                    prod_price: undefined, // Not used in current display
-                    // Stock product details
+                    prod_title: rawProd.prod_title,
+                    prod_price: undefined,
                     stock_product_title: sp.product_title,
                     stock_product_url: sp.url,
                     stock_unit_price: sp.unit_price,
@@ -367,17 +332,15 @@ export default function PipelinePage() {
                         prod_price: undefined,
                         not_found: true,
                         search_prod_ids: rawProd.search_prod_ids,
-                        has_search_ids: true // IDs exist but products not found
+                        has_search_ids: true
                     }]
                     : [{
                         prod_id: rawProd.prod_id?.toString(),
                         prod_title: rawProd.prod_title,
                         prod_price: undefined,
                         not_found: true,
-                        has_search_ids: false // No IDs at all
+                        has_search_ids: false
                     }];
-
-            console.log('orderedProds created:', orderedProds);
 
             const mappedRequest: PipelineRequest = {
                 request_id: rawProd.requests?.request_id || 0,
@@ -394,16 +357,11 @@ export default function PipelinePage() {
                     company: rawProd.requests.clients.company_name
                 } : undefined,
                 verified: !!rawProd.selected_id,
-                // Product details from requests_products
                 prod_quantity: rawProd.prod_quantity,
                 car_brand: rawProd.car_brand,
                 car_model: rawProd.car_model,
                 car_year: rawProd.car_year
             };
-
-            console.log('Mapped request:', mappedRequest);
-            console.log('ordered_prods:', mappedRequest.ordered_prods);
-            console.log('ordered_prods JSON:', JSON.stringify(mappedRequest.ordered_prods, null, 2));
 
             setSelectedRequest(mappedRequest);
         }
@@ -414,12 +372,11 @@ export default function PipelinePage() {
     };
 
     const handleVerify = async (requestId: number) => {
-        // For products, we need to find the product and toggle its selected_id
         try {
             const prod = rawProducts.find((p: any) => p.requests?.request_id === requestId);
             if (!prod) return;
 
-            const newSelectedId = prod.selected_id ? null : 1; // Toggle: if has selection, remove; if no selection, set to 1 (dummy)
+            const newSelectedId = prod.selected_id ? null : 1;
 
             await supabase
                 .from('requests_products')

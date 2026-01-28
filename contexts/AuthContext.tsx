@@ -3,28 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { User, Role, AuthContextType, UserStatus, defaultPermissions, MenuPermissions } from '../types/authTypes';
 
-// Dados mockados para fallback
 const mockUsers: User[] = [
     { id: '1', name: 'Admin', email: 'admin@otavio.ai', role_id: '1', roleName: 'admin', status: 'Ativo', createdAt: '09/01/2026' },
-    { id: '2', name: 'Maria Cruz', email: 'maria@empresa.com.br', role_id: '3', roleName: 'tecnico', status: 'Ativo', createdAt: '19/12/2025' },
-    { id: '3', name: 'Jose Silva', email: 'jose@empresa.com', role_id: '3', roleName: 'tecnico', status: 'Pendente', createdAt: '19/12/2025' },
+    { id: '2', name: 'Maria Cruz', email: 'maria@empresa.com.br', role_id: '2', roleName: 'usuario', status: 'Ativo', createdAt: '19/12/2025' },
+    { id: '3', name: 'Jose Silva', email: 'jose@empresa.com', role_id: '2', roleName: 'usuario', status: 'Pendente', createdAt: '19/12/2025' },
 ];
-
-const mockPasswords: Record<string, string> = {
-    'admin@otavio.ai': 'admin123',
-    'maria@empresa.com.br': 'tecnico123',
-};
 
 const mockRoles: Role[] = [
     { id: '1', name: 'admin', description: 'Administrador do sistema - acesso total', isSystem: true },
-    { id: '2', name: 'gerente', description: 'Gerente de equipe - acesso intermediário', isSystem: true },
-    { id: '3', name: 'tecnico', description: 'Técnico de campo - acesso básico', isSystem: true },
+    { id: '2', name: 'usuario', description: 'Usuário do sistema - acesso padrão', isSystem: true },
 ];
 
 const mockPermissions: Record<string, string[]> = {
     'admin': ['dashboard', 'insights', 'pipeline', 'chat', 'leads', 'knowledge', 'users'],
-    'gerente': ['dashboard', 'insights', 'pipeline', 'chat', 'leads', 'knowledge'],
-    'tecnico': ['dashboard', 'chat', 'leads', 'knowledge'],
+    'usuario': ['dashboard', 'insights', 'pipeline', 'chat', 'leads', 'knowledge'],
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,7 +76,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 .single();
 
             if (error || !profile) {
-                console.error('Error fetching profile:', error);
                 setUser(null);
                 setLoading(false);
                 return;
@@ -103,7 +94,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 name: profile.name,
                 email: profile.email || session.user.email || '',
                 role_id: profile.role_id,
-                roleName: profile.roles?.name || 'tecnico',
+                roleName: profile.roles?.name || 'usuario',
                 status: profile.status as UserStatus,
                 createdAt: new Date(profile.created_at).toLocaleDateString('pt-BR'),
                 deletedAt: profile.deleted_at,
@@ -113,8 +104,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             setUser(userData);
             const permissions = await fetchUserPermissions(userData.role_id);
-            console.log('AuthContext: Loading user', userData.email, 'Role:', userData.roleName);
-            console.log('AuthContext: Permissions loaded:', permissions);
             setUserPermissions(permissions);
 
             // Lazy load users/roles if has permission
@@ -123,8 +112,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 fetchRoles();
             }
 
-        } catch (err) {
-            console.error('Handle session error:', err);
+        } catch {
             setUser(null);
         } finally {
             setLoading(false);
@@ -155,7 +143,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 name: profile.name,
                 email: profile.email || `${profile.name.toLowerCase().replace(/\s/g, '.')}@email.com`,
                 role_id: profile.role_id,
-                roleName: profile.roles?.name || 'tecnico',
+                roleName: profile.roles?.name || 'usuario',
                 status: profile.status as UserStatus,
                 createdAt: new Date(profile.created_at).toLocaleDateString('pt-BR'),
                 deletedAt: profile.deleted_at,
@@ -230,7 +218,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const login = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
         if (!isSupabaseConfigured()) {
             const foundUser = mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-            if (foundUser && mockPasswords[foundUser.email] === password) {
+            if (foundUser && password.length > 0) {
                 if (foundUser.status === 'Pendente') return { success: false, message: 'Sua conta está aguardando aprovação.' };
                 if (foundUser.status === 'Inativo') return { success: false, message: 'Sua conta foi desativada.' };
                 setUser(foundUser);
@@ -280,7 +268,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 name,
                 email,
                 role_id: tecnicoRole?.id || '3',
-                roleName: 'tecnico',
+                roleName: 'usuario',
                 status: 'Pendente',
                 createdAt: new Date().toLocaleDateString('pt-BR'),
             };
@@ -292,7 +280,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const { error } = await supabase.auth.signUp({
                 email,
                 password,
-                options: { data: { name, role: 'tecnico' } }
+                options: { data: { name, role: 'usuario' } }
             });
             if (error) return { success: false, message: error.message };
 
@@ -339,8 +327,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 body: JSON.stringify({ email, password, name, roleId })
             });
             if (!response.ok) {
-                const error = await response.json();
-                console.error('Error creating user:', error);
                 return false;
             }
 
@@ -447,8 +433,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             await fetchRoles();
             return true;
-        } catch (err) {
-            console.error('Error creating role:', err);
+        } catch {
             return false;
         }
     };
@@ -492,8 +477,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             await fetchRoles();
             return true;
-        } catch (err) {
-            console.error('Error updating role:', err);
+        } catch {
             return false;
         }
     };
@@ -508,8 +492,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) throw error;
             await fetchRoles();
             return true;
-        } catch (err) {
-            console.error('Error deleting role:', err);
+        } catch {
             return false;
         }
     };

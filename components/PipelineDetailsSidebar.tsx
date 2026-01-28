@@ -1,42 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// This type should match the data structure passed from Pipeline.tsx
-export interface PipelineRequest {
-    request_id: number;
-    title: string;
-    status: string;
-    created_at: string;
-    total_price?: number;
-    ordered_prods?: Array<{
-        prod_id?: string;
-        prod_title?: string;
-        prod_price?: number;
-        // Stock product details
-        stock_product_title?: string;
-        stock_product_url?: string;
-        stock_unit_price?: number;
-        supplier_name?: string;
-        supplier_domain?: string;
-        // Not found flag
-        not_found?: boolean;
-        search_prod_ids?: string[];
-        has_search_ids?: boolean; // Indicates if search_prod_ids exists
-    }>;
-    client?: {
-        client_id?: number;
-        name_first?: string;
-        name_last?: string;
-        whatsapp?: string;
-        company?: string;
-    };
-    verified?: boolean;
-    // Product details from requests_products
-    prod_quantity?: number;
-    car_brand?: string;
-    car_model?: string;
-    car_year?: number;
-}
+import { StatusBadge } from './StatusBadge';
+import { PipelineRequest } from '../types/pipeline';
 
 interface PipelineDetailsSidebarProps {
     request: PipelineRequest | null;
@@ -45,32 +10,6 @@ interface PipelineDetailsSidebarProps {
     onVerify: (requestId: number) => void;
     onArchive: (requestId: number) => void;
 }
-
-const StatusBadge = ({ status }: { status: string }) => {
-    const s = (status || '').toLowerCase();
-    let color = 'slate';
-    let label = 'Desconhecido';
-
-    if (s.includes('deal') || s.includes('won') || s.includes('closed')) {
-        color = 'emerald';
-        label = 'Deal';
-    } else if (s.includes('cancel') || s.includes('lost')) {
-        color = 'rose';
-        label = 'Cancelado';
-    } else if (s.includes('not found') || s.includes('não encontrado')) {
-        color = 'amber';
-        label = 'Não Encontrado';
-    } else if (s.includes('feedback') || s.includes('quota') || s.includes('wait')) {
-        color = 'sky';
-        label = 'Aguardando';
-    }
-
-    return (
-        <span className={`px-2 py-0.5 text-xs font-semibold rounded bg-${color}-100 text-${color}-600 dark:bg-${color}-900/30 dark:text-${color}-400`}>
-            {label}
-        </span>
-    );
-};
 
 export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
     request,

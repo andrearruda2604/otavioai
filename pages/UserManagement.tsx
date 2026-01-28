@@ -56,8 +56,7 @@ export default function UserManagementPage() {
     const getRoleBadgeColor = (roleName: string) => {
         switch (roleName) {
             case 'admin': return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
-            case 'tecnico': return 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400';
-            case 'gerente': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400';
+            case 'usuario': return 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400';
             default: return 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300';
         }
     };
