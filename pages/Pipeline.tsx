@@ -13,9 +13,20 @@ interface KanbanColumnProps {
     onCardClick: (card: KanbanCardData) => void;
     onArchive?: (card: KanbanCardData) => void;
     onVerify?: (card: KanbanCardData) => void;
+    onRequestIdClick?: (requestId: number) => void;
+    selectedRequestIdFilter?: number | null;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards, onCardClick, onArchive, onVerify }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards, onCardClick, onArchive, onVerify, onRequestIdClick, selectedRequestIdFilter }) => {
+    // Filter cards by requestId if filter is active
+    const filteredCards = selectedRequestIdFilter !== null && selectedRequestIdFilter !== undefined
+        ? cards.filter(card => card.requestId === selectedRequestIdFilter)
+        : cards;
+
+    const displayCount = selectedRequestIdFilter !== null && selectedRequestIdFilter !== undefined
+        ? filteredCards.length
+        : count;
+
     return (
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between mb-2">
@@ -23,13 +34,13 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards,
                     <span className={`w-3 h-3 rounded-full bg-${color}-500`}></span>
                     <h3 className="font-bold text-slate-700 dark:text-slate-200">{title}</h3>
                 </div>
-                <span className={`px-2 py-0.5 text-xs font-bold bg-${color}-100 text-${color}-600 dark:bg-${color}-500/10 dark:text-${color}-400 rounded-full`}>{count}</span>
+                <span className={`px-2 py-0.5 text-xs font-bold bg-${color}-100 text-${color}-600 dark:bg-${color}-500/10 dark:text-${color}-400 rounded-full`}>{displayCount}</span>
             </div>
-            <div className={`space-y-4 min-h-[100px] ${cards.length === 0 ? 'opacity-50 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center' : ''}`}>
-                {cards.length === 0 ? (
+            <div className={`space-y-4 min-h-[100px] ${filteredCards.length === 0 ? 'opacity-50 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center' : ''}`}>
+                {filteredCards.length === 0 ? (
                     <span className="text-xs text-slate-400">Vazio</span>
                 ) : (
-                    cards.map((card, i) => (
+                    filteredCards.map((card, i) => (
                         <div
                             key={i}
                             onClick={() => onCardClick(card)}
@@ -41,7 +52,21 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, count, color, cards,
                                 <span className="material-icons-round text-slate-300 text-sm group-hover:text-primary transition-colors">open_in_new</span>
                             </div>
                             <div className="space-y-1 text-sm text-slate-500 dark:text-slate-400 mb-4">
-                                <p className="font-mono text-xs text-slate-400">#{card.id}</p>
+                                {card.requestId && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onRequestIdClick) onRequestIdClick(card.requestId!);
+                                        }}
+                                        className={`font-mono text-xs transition-colors ${selectedRequestIdFilter === card.requestId
+                                            ? 'text-cyan-600 dark:text-cyan-400 font-bold'
+                                            : 'text-cyan-500 hover:text-cyan-700 dark:hover:text-cyan-300'
+                                            } hover:underline`}
+                                        title="Clique para filtrar por esta solicitação"
+                                    >
+                                        #{card.requestId}
+                                    </button>
+                                )}
                                 {card.carInfo && <p className="text-xs font-medium text-primary dark:text-primary-light">{card.carInfo}</p>}
                                 {card.quantity && <p className="text-xs">Qtd: {card.quantity}</p>}
                                 <p>{card.date}</p>
@@ -103,6 +128,7 @@ export default function PipelinePage() {
     // Store raw product data for detail view
     const [rawProducts, setRawProducts] = useState<any[]>([]);
     const [selectedRequest, setSelectedRequest] = useState<PipelineRequest | null>(null);
+    const [selectedRequestIdFilter, setSelectedRequestIdFilter] = useState<number | null>(null);
 
     useEffect(() => {
         fetchPipelineData();
@@ -269,7 +295,8 @@ export default function PipelinePage() {
                     verified: !!prod.selected_id,
                     clientId: prod.requests?.clients?.client_id,
                     carInfo: carInfo || undefined,
-                    quantity: prod.prod_quantity || undefined
+                    quantity: prod.prod_quantity || undefined,
+                    requestId: prod.requests?.request_id
                 };
 
                 if (newColumns[columnTitle]) {
@@ -470,6 +497,11 @@ export default function PipelinePage() {
         }
     };
 
+    // Handle request ID filter click - toggle filter
+    const handleRequestIdFilter = (requestId: number) => {
+        setSelectedRequestIdFilter(prev => prev === requestId ? null : requestId);
+    };
+
     return (
         <main className="p-8">
             <header className="flex flex-col gap-6 mb-8">
@@ -479,6 +511,26 @@ export default function PipelinePage() {
                         <p className="text-slate-500 dark:text-slate-400 mt-1">Gerencie o follow-up de solicitações</p>
                     </div>
                 </div>
+
+                {/* Active Request Filter Indicator */}
+                {selectedRequestIdFilter && (
+                    <div className="flex items-center gap-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 p-3 rounded-xl">
+                        <span className="material-icons-round text-cyan-600 dark:text-cyan-400 text-sm">filter_alt</span>
+                        <span className="text-sm font-medium text-cyan-900 dark:text-cyan-300">
+                            Filtrando por Solicitação:
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-100 dark:bg-cyan-800/50 text-cyan-900 dark:text-cyan-200 text-sm font-bold rounded-md font-mono">
+                            #{selectedRequestIdFilter}
+                        </span>
+                        <button
+                            onClick={() => setSelectedRequestIdFilter(null)}
+                            className="ml-auto flex items-center gap-1 px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded-lg transition-colors"
+                        >
+                            <span className="material-icons-round text-sm">close</span>
+                            Limpar Filtro
+                        </button>
+                    </div>
+                )}
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-card-dark p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     {/* Date Filters */}
@@ -555,10 +607,10 @@ export default function PipelinePage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
-                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
-                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
-                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} />
+                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
+                    <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
+                    <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
+                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
                 </div>
             )}
 

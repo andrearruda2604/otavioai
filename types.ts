@@ -14,6 +14,7 @@ export interface KanbanCardData {
     clientId?: number;
     carInfo?: string; // Brand, model, year combined
     quantity?: number; // Product quantity
+    requestId?: number; // Request ID for filtering
 }
 
 export interface ChatMessage {
