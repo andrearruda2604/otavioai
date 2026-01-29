@@ -229,13 +229,21 @@ export default function PipelinePage() {
             // 4. Filter Search Term (Client-side)
             if (searchTerm.trim()) {
                 const lower = searchTerm.toLowerCase();
+                // Remove # if present for request ID search
+                const searchWithoutHash = lower.startsWith('#') ? lower.substring(1) : lower;
+
                 filteredData = filteredData.filter((prod: any) => {
                     const clientName = prod.requests?.clients
                         ? `${prod.requests.clients.name_first} ${prod.requests.clients.name_last}`.toLowerCase()
                         : '';
                     const title = prod.prod_title?.toLowerCase() || '';
                     const carInfo = `${prod.car_brand || ''} ${prod.car_model || ''} ${prod.car_year || ''}`.toLowerCase();
-                    return clientName.includes(lower) || title.includes(lower) || carInfo.includes(lower);
+                    const requestId = prod.requests?.request_id?.toString() || '';
+
+                    return clientName.includes(lower) ||
+                        title.includes(lower) ||
+                        carInfo.includes(lower) ||
+                        requestId.includes(searchWithoutHash);
                 });
             }
 
