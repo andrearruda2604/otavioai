@@ -387,9 +387,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const approveUser = async (userId: string): Promise<boolean> => {
         if (!isSupabaseConfigured()) return true;
         try {
-            console.log('Approving user:', userId, 'by:', user?.id);
-
-            const { data, error, count } = await supabase
+            const { data, error } = await supabase
                 .from('profiles')
                 .update({
                     status: 'Ativo',
@@ -399,23 +397,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 .eq('id', userId)
                 .select();
 
-            console.log('Approval response:', { data, error, count });
-
-            if (error) {
-                console.error('Approval error:', error);
-                return false;
-            }
+            if (error) return false;
 
             // Check if any rows were updated
-            if (!data || data.length === 0) {
-                console.error('No rows updated - possibly RLS blocking');
-                return false;
-            }
+            if (!data || data.length === 0) return false;
 
             await fetchAllUsers();
             return true;
-        } catch (err) {
-            console.error('Approval exception:', err);
+        } catch {
             return false;
         }
     };

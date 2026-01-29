@@ -100,15 +100,13 @@ export default function UserManagementPage() {
             setApproving(true);
             try {
                 const success = await approveUser(userToApprove.id);
-                console.log('Approval result:', success);
                 if (success) {
                     setApproveModalOpen(false);
                     setUserToApprove(null);
                 } else {
                     alert('Erro ao aprovar usuário. Verifique as permissões.');
                 }
-            } catch (error) {
-                console.error('Approval error:', error);
+            } catch {
                 alert('Erro ao aprovar usuário.');
             } finally {
                 setApproving(false);
