@@ -387,15 +387,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const approveUser = async (userId: string): Promise<boolean> => {
         if (!isSupabaseConfigured()) return true;
         try {
-            const { error } = await supabase.from('profiles').update({
-                status: 'Ativo',
-                approved_by: user?.id,
-                approved_at: new Date().toISOString()
-            }).eq('id', userId);
-            if (error) return false;
+            console.log('Approving user:', userId, 'by:', user?.id);
+
+            const { data, error, count } = await supabase
+                .from('profiles')
+                .update({
+                    status: 'Ativo',
+                    approved_by: user?.id,
+                    approved_at: new Date().toISOString()
+                })
+                .eq('id', userId)
+                .select();
+
+            console.log('Approval response:', { data, error, count });
+
+            if (error) {
+                console.error('Approval error:', error);
+                return false;
+            }
+
+            // Check if any rows were updated
+            if (!data || data.length === 0) {
+                console.error('No rows updated - possibly RLS blocking');
+                return false;
+            }
+
             await fetchAllUsers();
             return true;
-        } catch { return false; }
+        } catch (err) {
+            console.error('Approval exception:', err);
+            return false;
+        }
     };
 
     const refreshUsers = async () => { await fetchAllUsers(); };
