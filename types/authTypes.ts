@@ -55,6 +55,7 @@ export interface AuthContextType {
     isAuthenticated: boolean;
     isAdmin: boolean;
     isManager: boolean;
+    isPendingApproval: boolean;  // Indica se o usuário está aguardando aprovação
     userPermissions: string[];  // Lista de route_keys que o usuário pode acessar
     login: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
     signup: (email: string, password: string, name: string) => Promise<{ success: boolean; message: string }>;

@@ -15,6 +15,7 @@ import SignupPage from './pages/Signup';
 import UserManagementPage from './pages/UserManagement';
 import ForgotPasswordPage from './pages/ForgotPassword';
 import UpdatePasswordPage from './pages/UpdatePassword';
+import PendingApprovalPage from './pages/PendingApproval';
 
 const MobileHeader = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const { user } = useAuth();
@@ -189,12 +190,17 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
 };
 
 function AppContent() {
-    const { isAuthenticated, userPermissions } = useAuth();
+    const { isAuthenticated, userPermissions, isPendingApproval } = useAuth();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    const publicRoutes = ['/login', '/signup', '/forgot-password', '/update-password'];
+    const publicRoutes = ['/login', '/signup', '/forgot-password', '/update-password', '/pending-approval'];
     const isPublicRoute = publicRoutes.includes(location.pathname);
+
+    // Show pending approval page if user tried to login with pending account
+    if (isPendingApproval && location.pathname !== '/pending-approval') {
+        return <Navigate to="/pending-approval" replace />;
+    }
 
     if (!isAuthenticated && !isPublicRoute) {
         return <Navigate to="/login" replace />;
@@ -211,6 +217,7 @@ function AppContent() {
                 <Route path="/signup" element={<SignupPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/update-password" element={<UpdatePasswordPage />} />
+                <Route path="/pending-approval" element={<PendingApprovalPage />} />
             </Routes>
         );
     }

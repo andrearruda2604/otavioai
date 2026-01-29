@@ -29,6 +29,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [userPermissions, setUserPermissions] = useState<string[]>([]);
     const [showDeleted, setShowDeleted] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [isPendingApproval, setIsPendingApproval] = useState(false);
 
     // Buscar permissões do usuário baseado no role_id
     const fetchUserPermissions = async (roleId: string | null): Promise<string[]> => {
@@ -57,6 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!session?.user) {
             setUser(null);
             setUserPermissions([]);
+            setIsPendingApproval(false);
             setLoading(false);
             return;
         }
@@ -81,13 +83,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 return;
             }
 
-            // Check pending status
+            // Check pending status - set flag instead of logging out
             if (profile.status === 'Pendente') {
-                await supabase.auth.signOut();
+                setIsPendingApproval(true);
                 setUser(null);
+                setUserPermissions([]);
+                await supabase.auth.signOut();
                 setLoading(false);
                 return;
             }
+
+            // Reset pending flag if status is active
+            setIsPendingApproval(false);
 
             const userData: User = {
                 id: profile.id,
@@ -552,6 +559,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated: !!user,
         isAdmin: user?.roleName === 'admin',
         isManager: user?.roleName === 'admin' || user?.roleName === 'gerente',
+        isPendingApproval,
         userPermissions,
         login,
         signup,
