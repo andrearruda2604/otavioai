@@ -16,6 +16,9 @@ export default function UserManagementPage() {
     const [deleteProfileModalOpen, setDeleteProfileModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
     const [roleToDelete, setRoleToDelete] = useState<{ id: string; name: string } | null>(null);
+    const [approveModalOpen, setApproveModalOpen] = useState(false);
+    const [userToApprove, setUserToApprove] = useState<{ id: string; name: string; email: string } | null>(null);
+    const [approving, setApproving] = useState(false);
 
     const {
         users,
@@ -84,6 +87,32 @@ export default function UserManagementPage() {
             await deleteUser(userToDelete.id);
             setDeleteModalOpen(false);
             setUserToDelete(null);
+        }
+    };
+
+    const handleApproveClick = (userId: string, userName: string, userEmail: string) => {
+        setUserToApprove({ id: userId, name: userName, email: userEmail });
+        setApproveModalOpen(true);
+    };
+
+    const confirmApprove = async () => {
+        if (userToApprove) {
+            setApproving(true);
+            try {
+                const success = await approveUser(userToApprove.id);
+                console.log('Approval result:', success);
+                if (success) {
+                    setApproveModalOpen(false);
+                    setUserToApprove(null);
+                } else {
+                    alert('Erro ao aprovar usuário. Verifique as permissões.');
+                }
+            } catch (error) {
+                console.error('Approval error:', error);
+                alert('Erro ao aprovar usuário.');
+            } finally {
+                setApproving(false);
+            }
         }
     };
 
@@ -275,7 +304,7 @@ export default function UserManagementPage() {
                                                         isDeleted={!!userItem.deletedAt}
                                                         isPending={userItem.status === 'Pendente'}
                                                         isActive={userItem.status === 'Ativo'}
-                                                        onApprove={isManager && userItem.status === 'Pendente' ? () => approveUser(userItem.id) : undefined}
+                                                        onApprove={isManager && userItem.status === 'Pendente' ? () => handleApproveClick(userItem.id, userItem.name, userItem.email) : undefined}
                                                         onDeactivate={() => updateUserStatus(userItem.id, 'Inativo')}
                                                         onActivate={() => updateUserStatus(userItem.id, 'Ativo')}
                                                         onDelete={() => handleDeleteClick(userItem.id, userItem.name)}
@@ -353,6 +382,58 @@ export default function UserManagementPage() {
                                             className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
                                         >
                                             Excluir
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Approve Confirmation Modal */}
+                    {approveModalOpen && userToApprove && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setApproveModalOpen(false)}></div>
+                            <div className="relative bg-white dark:bg-card-dark rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                                <div className="p-8 text-center">
+                                    <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <span className="material-icons-round text-emerald-600 dark:text-emerald-400 text-4xl">verified_user</span>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                                        Aprovar Acesso
+                                    </h3>
+                                    <p className="text-slate-600 dark:text-slate-400 mb-2">
+                                        Tem certeza que deseja aprovar o acesso de:
+                                    </p>
+                                    <p className="text-slate-900 dark:text-white font-semibold mb-1">
+                                        {userToApprove.name}
+                                    </p>
+                                    <p className="text-sm text-primary mb-6">
+                                        {userToApprove.email}
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            onClick={() => setApproveModalOpen(false)}
+                                            disabled={approving}
+                                            className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={confirmApprove}
+                                            disabled={approving}
+                                            className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {approving ? (
+                                                <>
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                                    Aprovando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="material-icons-round text-lg">check</span>
+                                                    Aprovar
+                                                </>
+                                            )}
                                         </button>
                                     </div>
                                 </div>
