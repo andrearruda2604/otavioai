@@ -358,7 +358,7 @@ export default function ChatPage() {
                                         {client.name_first} {client.name_last}
                                     </h4>
                                     <span className="text-xs text-slate-400 whitespace-nowrap">
-                                        {client.last_message ? new Date(client.last_message).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(client.last_message).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                        {client.last_message ? new Date(client.last_message).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' - ' + new Date(client.last_message).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center mb-1">
