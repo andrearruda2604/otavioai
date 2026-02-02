@@ -33,7 +33,7 @@ const MobileHeader = ({ onMenuClick }: { onMenuClick: () => void }) => {
                     <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                         <span className="material-icons-round text-white text-lg">smart_toy</span>
                     </div>
-                    <span className="text-lg font-bold text-white">Otavio AI</span>
+                    <span className="text-lg font-bold text-white">Num Chat AI</span>
                 </div>
             </div>
             <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
@@ -107,7 +107,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
                         <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
                             <span className="material-icons-round text-white">smart_toy</span>
                         </div>
-                        <h1 className="text-xl font-bold text-white tracking-tight">Otavio AI</h1>
+                        <h1 className="text-xl font-bold text-white tracking-tight">Num Chat AI</h1>
                     </div>
                     <button
                         onClick={onClose}

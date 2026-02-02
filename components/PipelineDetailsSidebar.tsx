@@ -113,19 +113,21 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                         </div>
                     </div>
 
-                    {/* Produtos Section - Only show products with stock details OR not found message */}
-                    {request.ordered_prods && (request.ordered_prods.filter(p => p.stock_product_title).length > 0 || request.ordered_prods.some(p => p.not_found)) && (
+                    {/* Produtos Section - Always show if ordered_prods exists and has items */}
+                    {request.ordered_prods && request.ordered_prods.length > 0 && (
                         <div>
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
                                 <span className="material-icons-round text-sm">shopping_bag</span>
                                 Produtos Encontrados
                             </p>
                             <div className="space-y-3">
-                                {request.ordered_prods.filter(p => p.stock_product_title).map((prod, idx) => (
+                                {request.ordered_prods.filter(p => !p.not_found).map((prod, idx) => (
                                     <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
                                         <div className="p-3 flex justify-between items-start">
                                             <div className="flex-1">
-                                                <p className="font-medium text-slate-800 dark:text-white text-sm">{prod.stock_product_title}</p>
+                                                <p className="font-medium text-slate-800 dark:text-white text-sm">
+                                                    {prod.stock_product_title || prod.prod_title || 'Produto sem nome'}
+                                                </p>
                                                 {prod.stock_unit_price && (
                                                     <p className="text-sm font-semibold text-emerald-600">R$ {prod.stock_unit_price.toFixed(2).replace('.', ',')}</p>
                                                 )}
@@ -140,7 +142,7 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                                 </span>
                                             </button>
                                         </div>
-                                        {expandedProducts.has(idx) && prod.stock_product_title && (
+                                        {expandedProducts.has(idx) && (
                                             <div className="px-3 pb-3 pt-0 border-t border-slate-200 dark:border-slate-700 mt-2 space-y-2">
                                                 <div className="pt-2">
                                                     <p className="text-xs text-slate-400 mb-1">Produto no Estoque:</p>
@@ -151,11 +153,13 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                                             rel="noopener noreferrer"
                                                             className="text-sm font-medium text-primary hover:text-primary-dark dark:text-primary-light flex items-center gap-1"
                                                         >
-                                                            {prod.stock_product_title}
+                                                            {prod.stock_product_title || prod.prod_title}
                                                             <span className="material-icons-round text-xs">open_in_new</span>
                                                         </a>
                                                     ) : (
-                                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{prod.stock_product_title}</p>
+                                                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                            {prod.stock_product_title || prod.prod_title || 'Não vinculado ao estoque'}
+                                                        </p>
                                                     )}
                                                 </div>
                                                 {prod.stock_unit_price && (

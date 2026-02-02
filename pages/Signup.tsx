@@ -83,7 +83,7 @@ export default function SignupPage() {
                         <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                             <span className="material-icons-round text-white text-2xl">smart_toy</span>
                         </div>
-                        <h1 className="text-2xl font-bold text-white">Otavio AI</h1>
+                        <h1 className="text-2xl font-bold text-white">Num Chat AI</h1>
                     </div>
                 </div>
 
@@ -99,7 +99,7 @@ export default function SignupPage() {
                 </div>
 
                 <div className="relative z-10 text-white/40 text-sm">
-                    © 2026 Otavio AI. Todos os direitos reservados.
+                    © 2026 Num Chat AI. Todos os direitos reservados.
                 </div>
             </div>
 
@@ -110,7 +110,7 @@ export default function SignupPage() {
                         <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
                             <span className="material-icons-round text-white text-2xl">smart_toy</span>
                         </div>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Otavio AI</h1>
+                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Num Chat AI</h1>
                     </div>
 
                     <div className="text-center lg:text-left">

@@ -111,7 +111,7 @@ export default function InsightsPage() {
                 .from('requests_products')
                 .select(`
                     created_at,
-                    prod_title,
+                    prod_name_core,
                     car_brand,
                     car_model,
                     car_year,
@@ -178,7 +178,7 @@ export default function InsightsPage() {
         let cascadedData = filtered;
 
         if (selectedProduct) {
-            cascadedData = cascadedData.filter(item => item.prod_title === selectedProduct);
+            cascadedData = cascadedData.filter(item => item.prod_name_core === selectedProduct);
         }
         if (selectedBrand) {
             cascadedData = cascadedData.filter(item => item.car_brand === selectedBrand);
@@ -211,7 +211,7 @@ export default function InsightsPage() {
         // Apply filters excluding the current chart's filter
         const getFilteredData = (excludeFilter: 'product' | 'brand' | 'model' | 'year') => {
             let data = filtered;
-            if (excludeFilter !== 'product' && selectedProduct) data = data.filter(item => item.prod_title === selectedProduct);
+            if (excludeFilter !== 'product' && selectedProduct) data = data.filter(item => item.prod_name_core === selectedProduct);
             if (excludeFilter !== 'brand' && selectedBrand) data = data.filter(item => item.car_brand === selectedBrand);
             if (excludeFilter !== 'model' && selectedModel) data = data.filter(item => item.car_model === selectedModel);
             if (excludeFilter !== 'year' && selectedYear) data = data.filter(item => String(item.car_year) === selectedYear);
@@ -219,7 +219,7 @@ export default function InsightsPage() {
         };
 
         return {
-            products: aggregate(getFilteredData('product'), 'prod_title'),
+            products: aggregate(getFilteredData('product'), 'prod_name_core'),
             brands: aggregate(getFilteredData('brand'), 'car_brand'),
             models: aggregate(getFilteredData('model'), 'car_model'),
             years: aggregate(getFilteredData('year'), 'car_year').sort((a, b) => Number(a.name) - Number(b.name))

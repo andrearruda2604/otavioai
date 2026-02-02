@@ -615,10 +615,10 @@ export default function PipelinePage() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="rose" cards={columns['Not Found']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
                     <KanbanColumn title="Sem Feedback" count={columns['Pending Feedback'].length} color="amber" cards={columns['Pending Feedback']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
                     <KanbanColumn title="Cancelado" count={columns['Cancelled'].length} color="slate" cards={columns['Cancelled']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
-                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="primary" cards={columns['Deal']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
+                    <KanbanColumn title="Não Encontrado" count={columns['Not Found'].length} color="orange" cards={columns['Not Found']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
+                    <KanbanColumn title="Deal" count={columns['Deal'].length} color="emerald" cards={columns['Deal']} onCardClick={handleCardClick} onArchive={handleBulkArchive} onVerify={handleVerifyFromCard} onRequestIdClick={handleRequestIdFilter} selectedRequestIdFilter={selectedRequestIdFilter} />
                 </div>
             )}
 

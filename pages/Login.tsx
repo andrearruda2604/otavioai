@@ -44,24 +44,19 @@ export default function LoginPage() {
                         <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                             <span className="material-icons-round text-white text-2xl">smart_toy</span>
                         </div>
-                        <h1 className="text-2xl font-bold text-white">Otavio AI</h1>
+                        <h1 className="text-2xl font-bold text-white">Num Chat AI</h1>
                     </div>
                 </div>
 
                 <div className="relative z-10 space-y-6">
                     <h2 className="text-4xl font-bold text-white leading-tight">
                         Inteligência Artificial<br />
-                        para Vendas
+                        para Autopeças
                     </h2>
                     <p className="text-lg text-white/80 max-w-md">
-                        Transforme seus leads em clientes com análises inteligentes,
-                        insights preditivos e automação de pipeline.
+                        Transforme conversas em vendas, com dados, atendimento humanizado e imediato
                     </p>
                     <div className="flex items-center gap-6 text-white/60 text-sm">
-                        <div className="flex items-center gap-2">
-                            <span className="material-icons-round text-lg">verified</span>
-                            <span>+500 empresas</span>
-                        </div>
                         <div className="flex items-center gap-2">
                             <span className="material-icons-round text-lg">trending_up</span>
                             <span>+40% conversão</span>
@@ -82,7 +77,7 @@ export default function LoginPage() {
                         <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
                             <span className="material-icons-round text-white text-2xl">smart_toy</span>
                         </div>
-                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Otavio AI</h1>
+                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Num Chat AI</h1>
                     </div>
 
                     <div className="text-center lg:text-left">

@@ -278,7 +278,7 @@ export default function DashboardPage() {
                         <div className="flex items-center justify-between mb-10">
                             <div>
                                 <h3 className="text-xl font-bold dark:text-white">Tendência de Solicitações</h3>
-                                <p className="text-sm text-slate-500">Solicitações vs Fechamentos (Últimos 14 dias)</p>
+                                <p className="text-sm text-slate-500">Solicitações vs Fechamentos</p>
                             </div>
                         </div>
                         <div className="h-[400px] w-full relative">
@@ -292,31 +292,6 @@ export default function DashboardPage() {
                                     <Line type="monotone" dataKey="deals" name="Fechamentos" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981' }} />
                                 </LineChart>
                             </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                            <h3 className="text-lg font-bold mb-6 dark:text-white">Últimas Interações</h3>
-                            <div className="space-y-4">
-                                {interactions.map((item, i) => (
-                                    <InteractionItem
-                                        key={i}
-                                        {...item}
-                                        onClick={() => navigate(`/chat?chatId=${item.clientId}`)}
-                                    />
-                                ))}
-                                {interactions.length === 0 && <p className="text-slate-500">Nenhuma interação recente.</p>}
-                            </div>
-                        </div>
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
-                            <h3 className="text-lg font-bold mb-6 dark:text-white">Top Marcas Solicitadas</h3>
-                            <div className="space-y-6">
-                                {brandStats.map((stat, i) => (
-                                    <CategoryBar key={i} label={stat.label} percent={stat.percent} color={stat.color} />
-                                ))}
-                                {brandStats.length === 0 && <p className="text-slate-500">Sem dados de marcas ainda.</p>}
-                            </div>
                         </div>
                     </div>
                 </>

@@ -170,7 +170,16 @@ export default function KnowledgePage() {
     if (loading) return <div className="p-8 text-center text-slate-500">Carregando...</div>;
 
     return (
-        <main className="p-8 max-w-4xl mx-auto space-y-8">
+        <main className="p-8 max-w-4xl mx-auto space-y-8 relative overflow-hidden">
+            {/* Overlay for "Coming Soon" */}
+            <div className="absolute inset-0 z-50 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
+                <div className="bg-white dark:bg-slate-800 px-8 py-4 rounded-full shadow-lg border border-slate-200 dark:border-slate-700">
+                    <p className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        <span className="material-icons-round text-primary">rocket_launch</span>
+                        Disponível em breve
+                    </p>
+                </div>
+            </div>
             <header>
                 <h2 className="text-3xl font-bold dark:text-white">Base de Conhecimento</h2>
                 <p className="text-slate-500 dark:text-slate-400 mt-1">Configure as informações da sua empresa para o agente</p>

@@ -17,9 +17,9 @@ export default function ChatPage() {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Stats
-    const [totalContacts, setTotalContacts] = useState(0);
-    const [totalMessages, setTotalMessages] = useState(0);
-    const [avgResponseTime, setAvgResponseTime] = useState('--');
+    const [totalLeads, setTotalLeads] = useState(0);
+    const [receivedMessages, setReceivedMessages] = useState(0);
+    const [followUpCount, setFollowUpCount] = useState(0);
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -84,24 +84,35 @@ export default function ChatPage() {
 
     const fetchStats = async () => {
         try {
-            // 1. Total Contacts
+            // 1. Total Leads (from clients table)
             const { count: contactCount } = await supabase
                 .from('clients')
                 .select('*', { count: 'exact', head: true })
                 .or('archived.is.null,archived.eq.false');
 
-            setTotalContacts(contactCount || 0);
+            setTotalLeads(contactCount || 0);
 
-            // 2. Total Messages
-            const { count: msgCount } = await supabase
-                .from('n8n_chat_histories')
-                .select('*', { count: 'exact', head: true });
+            // 2. Mensagens Recebidas (from count_messages id=1)
+            const { data: msgData } = await supabase
+                .from('count_messages')
+                .select('messages_counter')
+                .eq('id', 1)
+                .single();
 
-            setTotalMessages(msgCount || 0);
+            if (msgData) {
+                setReceivedMessages(msgData.messages_counter || 0);
+            }
 
-            // 3. Avg Response Time (Placeholder - would require more complex logic)
-            // For now, set a static placeholder or simple calculation
-            setAvgResponseTime('5 min');
+            // 3. Follow Up (from count_messages id=2)
+            const { data: fupData } = await supabase
+                .from('count_messages')
+                .select('messages_counter')
+                .eq('id', 2)
+                .single();
+
+            if (fupData) {
+                setFollowUpCount(fupData.messages_counter || 0);
+            }
 
         } catch (error) {
             console.error('Error fetching stats:', error);
@@ -179,6 +190,7 @@ export default function ChatPage() {
                 .from('n8n_chat_histories')
                 .select('*')
                 .or(`session_id.eq.${sessionId},session_id.eq.${sessionId}_orq`)
+                .in('message->>type', ['human', 'AI']) // Filter for human or AI messages only
                 .order('id', { ascending: true });
 
             if (error) throw error;
@@ -267,7 +279,7 @@ export default function ChatPage() {
     const getStatusColor = (status?: string) => {
         const s = (status || '').toLowerCase();
         if (s.includes('deal') || s.includes('won')) return 'bg-green-100 text-green-700';
-        if (s.includes('cancel') || s.includes('lost')) return 'bg-red-100 text-red-700';
+        if (s.includes('cancel') || s.includes('lost')) return 'bg-slate-200 text-slate-600'; // Changed to gray
         if (s.includes('open') || s.includes('new')) return 'bg-blue-100 text-blue-700';
         return 'bg-slate-100 text-slate-500';
     };
@@ -281,9 +293,9 @@ export default function ChatPage() {
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Acompanhe as conversas do agente com os clientes</p>
                 </div>
                 <div className="flex flex-wrap gap-4">
-                    <ChatStatCard title="Contatos" value={totalContacts.toString()} icon="group" color="blue" />
-                    <ChatStatCard title="Mensagens" value={totalMessages.toString()} icon="chat" color="emerald" />
-                    <ChatStatCard title="Tempo Médio de Resposta" value={avgResponseTime} icon="schedule" color="indigo" />
+                    <ChatStatCard title="Leads" value={totalLeads.toString()} icon="group" color="blue" />
+                    <ChatStatCard title="Mensagens Recebidas" value={receivedMessages.toString()} icon="chat" color="emerald" />
+                    <ChatStatCard title="Follow Up" value={followUpCount.toString()} icon="send" color="indigo" />
                 </div>
             </header>
 
