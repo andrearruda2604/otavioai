@@ -190,7 +190,6 @@ export default function ChatPage() {
                 .from('n8n_chat_histories')
                 .select('*')
                 .or(`session_id.eq.${sessionId},session_id.eq.${sessionId}_orq`)
-                .in('message->>type', ['human', 'AI']) // Filter for human or AI messages only
                 .order('id', { ascending: true });
 
             if (error) throw error;
@@ -279,7 +278,7 @@ export default function ChatPage() {
     const getStatusColor = (status?: string) => {
         const s = (status || '').toLowerCase();
         if (s.includes('deal') || s.includes('won')) return 'bg-green-100 text-green-700';
-        if (s.includes('cancel') || s.includes('lost')) return 'bg-slate-200 text-slate-600'; // Changed to gray
+        if (s.includes('cancel') || s.includes('lost')) return 'bg-rose-100 text-rose-700';
         if (s.includes('open') || s.includes('new')) return 'bg-blue-100 text-blue-700';
         return 'bg-slate-100 text-slate-500';
     };
@@ -293,9 +292,9 @@ export default function ChatPage() {
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Acompanhe as conversas do agente com os clientes</p>
                 </div>
                 <div className="flex flex-wrap gap-4">
-                    <ChatStatCard title="Leads" value={totalLeads.toString()} icon="group" color="blue" />
-                    <ChatStatCard title="Mensagens Recebidas" value={receivedMessages.toString()} icon="chat" color="emerald" />
-                    <ChatStatCard title="Follow Up" value={followUpCount.toString()} icon="send" color="indigo" />
+                    <ChatStatCard title="Contatos" value={totalLeads.toString()} icon="group" color="blue" />
+                    <ChatStatCard title="Mensagens" value={receivedMessages.toString()} icon="chat" color="emerald" />
+                    <ChatStatCard title="Tempo Médio de Resposta" value={followUpCount.toString()} icon="schedule" color="indigo" />
                 </div>
             </header>
 
