@@ -16,6 +16,7 @@ import UserManagementPage from './pages/UserManagement';
 import ForgotPasswordPage from './pages/ForgotPassword';
 import UpdatePasswordPage from './pages/UpdatePassword';
 import PendingApprovalPage from './pages/PendingApproval';
+import ChangePasswordModal from './components/ChangePasswordModal';
 
 const MobileHeader = ({ onMenuClick }: { onMenuClick: () => void }) => {
     const { user } = useAuth();
@@ -48,6 +49,7 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
     const { user, logout, userPermissions } = useAuth();
     const isActive = (path: string) => location.pathname === path;
     const [isDark, setIsDark] = useState(false);
+    const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
 
     const toggleDarkMode = () => {
         const isCurrentlyDark = document.documentElement.classList.contains('dark');
@@ -165,12 +167,18 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
                     </button>
 
                     <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                        <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-                            <span className="material-icons-round text-primary">person</span>
-                        </div>
-                        <div className="flex flex-col flex-1 min-w-0">
-                            <span className="text-sm font-semibold text-white truncate">{user?.name || 'Usuário'}</span>
-                            <span className="text-xs text-slate-500 capitalize">{user?.roleName || 'Carregando...'}</span>
+                        <div
+                            className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => setChangePasswordModalOpen(true)}
+                            title="Alterar senha"
+                        >
+                            <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                                <span className="material-icons-round text-primary">person</span>
+                            </div>
+                            <div className="flex flex-col flex-1 min-w-0">
+                                <span className="text-sm font-semibold text-white truncate">{user?.name || 'Usuário'}</span>
+                                <span className="text-xs text-slate-500 capitalize">{user?.roleName || 'Carregando...'}</span>
+                            </div>
                         </div>
                         <button
                             onClick={logout}
@@ -185,6 +193,11 @@ const Sidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
                     </div>
                 </div>
             </aside>
+
+            <ChangePasswordModal
+                isOpen={changePasswordModalOpen}
+                onClose={() => setChangePasswordModalOpen(false)}
+            />
         </>
     );
 };
