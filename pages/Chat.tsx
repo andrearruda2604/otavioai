@@ -237,7 +237,8 @@ export default function ChatPage() {
         let text = msg.message.content || '';
 
         // Filter out internal agent messages
-        if (text.includes('Calling agente_manager with input')) return '';
+        // Catches "Calling agente_manager with input", "Calling agente_qualificador with input", etc.
+        if (text.match(/Calling \w+ with input:/)) return '';
         if (text.trim().startsWith('[{"output":"')) return '';
 
         // Robust cleanup for N8N "Used tools" logs which may contain nested brackets [ ]
