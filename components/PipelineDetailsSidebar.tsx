@@ -131,9 +131,11 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                                 {prod.stock_unit_price ? (
                                                     <p className="text-sm font-semibold text-emerald-600">R$ {prod.stock_unit_price.toFixed(2).replace('.', ',')}</p>
                                                 ) : (
-                                                    <p className="text-xs text-slate-500 italic mt-1">
-                                                        {prod.not_found ? 'Item fora de estoque / Histórico' : 'Preço sob consulta'}
-                                                    </p>
+                                                    !prod.not_found && (
+                                                        <p className="text-xs text-slate-500 italic mt-1">
+                                                            Preço sob consulta
+                                                        </p>
+                                                    )
                                                 )}
                                             </div>
                                             {!prod.not_found && (
