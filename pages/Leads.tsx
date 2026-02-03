@@ -160,10 +160,10 @@ export default function LeadsPage() {
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="w-48 px-3 py-2.5 bg-background-light dark:bg-background-dark border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:text-white cursor-pointer"
                     >
-                        <option value="all">Todos os Status</option>
-                        <option value="open">Open</option>
-                        <option value="deal">Deal</option>
-                        <option value="canceled">Canceled</option>
+                        <option value="all">📂 Todos os Status</option>
+                        <option value="open">🔵 Open</option>
+                        <option value="deal">🟢 Deal</option>
+                        <option value="canceled">⚪ Canceled</option>
                     </select>
                 </div>
             </div>

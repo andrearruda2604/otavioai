@@ -347,7 +347,7 @@ export default function ChatPage() {
                                 <option value="all">📂 Todos Status</option>
                                 <option value="open">🔵 Open</option>
                                 <option value="deal">🟢 Deal</option>
-                                <option value="canceled">🔴 Canceled</option>
+                                <option value="canceled">⚪ Canceled</option>
                             </select>
                         </div>
                     </div>
