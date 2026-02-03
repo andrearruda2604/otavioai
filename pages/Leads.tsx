@@ -13,6 +13,7 @@ export default function LeadsPage() {
     const [leads, setLeads] = useState<ClientSession[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -26,7 +27,7 @@ export default function LeadsPage() {
             fetchLeads();
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchTerm]);
+    }, [searchTerm, statusFilter]);
 
     const fetchLeads = async () => {
         try {
@@ -40,7 +41,6 @@ export default function LeadsPage() {
                         created_at
                     )
                 `)
-                // We fetch all initially and sort/paginate on client to handle the complex 'latestStatus' logic + 'Empresa' column removal requests
                 .order('last_message', { ascending: false });
 
             // Search Filter
@@ -61,7 +61,16 @@ export default function LeadsPage() {
                     const latest = sortedRequests[0]?.status || 'Sem Status';
                     return { ...client, latestStatus: latest };
                 });
-                setLeads(processedData);
+
+                // Status Filter (Client-side)
+                let filteredData = processedData;
+                if (statusFilter !== 'all') {
+                    filteredData = processedData.filter((c: any) =>
+                        (c.latestStatus || '').toLowerCase() === statusFilter.toLowerCase()
+                    );
+                }
+
+                setLeads(filteredData);
                 setCurrentPage(1); // Reset to first page on new search
             }
         } catch (error) {
@@ -90,6 +99,9 @@ export default function LeadsPage() {
             } else if (sortConfig.key === 'status') {
                 aValue = (a.latestStatus || '').toLowerCase();
                 bValue = (b.latestStatus || '').toLowerCase();
+            } else if (sortConfig.key === 'whatsapp') {
+                aValue = (a.whatsapp || '').toLowerCase();
+                bValue = (b.whatsapp || '').toLowerCase();
             }
 
             if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -132,15 +144,27 @@ export default function LeadsPage() {
             </div>
 
             <div className="bg-white dark:bg-card-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4 mb-6">
-                <div className="relative w-full max-w-md">
-                    <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
-                    <input
-                        className="w-full pl-10 pr-4 py-2.5 bg-background-light dark:bg-background-dark border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:text-white"
-                        placeholder="Buscar por nome..."
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                <div className="flex gap-4 w-full max-w-2xl">
+                    <div className="relative flex-1">
+                        <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                        <input
+                            className="w-full pl-10 pr-4 py-2.5 bg-background-light dark:bg-background-dark border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:text-white"
+                            placeholder="Buscar por nome..."
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-48 px-3 py-2.5 bg-background-light dark:bg-background-dark border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:text-white cursor-pointer"
+                    >
+                        <option value="all">Todos os Status</option>
+                        <option value="open">Open</option>
+                        <option value="deal">Deal</option>
+                        <option value="canceled">Canceled</option>
+                    </select>
                 </div>
             </div>
 
