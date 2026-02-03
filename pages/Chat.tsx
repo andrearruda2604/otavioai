@@ -236,6 +236,10 @@ export default function ChatPage() {
         if (!msg.message) return '';
         let text = msg.message.content || '';
 
+        // Filter out internal agent messages
+        if (text.includes('Calling agente_manager with input')) return '';
+        if (text.trim().startsWith('[{"output":"')) return '';
+
         // Robust cleanup for N8N "Used tools" logs which may contain nested brackets [ ]
         // Example: [Used tools: ... "pending": [] ... ] Actual message
         while (text.includes('[Used tools:')) {
