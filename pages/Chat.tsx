@@ -13,6 +13,7 @@ export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [input, setInput] = useState('');
+    const [isExpanded, setIsExpanded] = useState(false);
     const [aiEnabled, setAiEnabled] = useState(true);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -398,7 +399,7 @@ export default function ChatPage() {
 
                 {/* Chat Area */}
                 {selectedSessionId ? (
-                    <section className="flex-1 bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
+                    <section className={`bg-white dark:bg-card-dark border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden transition-all duration-300 ${isExpanded ? 'fixed inset-0 z-50 rounded-none' : 'flex-1 rounded-2xl'}`}>
                         <header className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm">
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setSelectedSessionId(null)} className="md:hidden text-slate-500">
@@ -413,12 +414,25 @@ export default function ChatPage() {
                                 </div>
                             </div>
 
-                            {/* Status Label in Header */}
-                            {selectedClient?.latestStatus && (
-                                <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${getStatusColor(selectedClient.latestStatus)}`}>
-                                    {selectedClient.latestStatus}
-                                </span>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {/* Status Label in Header */}
+                                {selectedClient?.latestStatus && (
+                                    <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${getStatusColor(selectedClient.latestStatus)}`}>
+                                        {selectedClient.latestStatus}
+                                    </span>
+                                )}
+
+                                {/* Maximize Button */}
+                                <button
+                                    onClick={() => setIsExpanded(!isExpanded)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-primary transition-colors shadow-sm ml-2"
+                                    title={isExpanded ? "Reduzir" : "Expandir"}
+                                >
+                                    <span className="material-icons-round text-lg">
+                                        {isExpanded ? 'close_fullscreen' : 'open_in_full'}
+                                    </span>
+                                </button>
+                            </div>
                         </header>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 dark:bg-slate-900/20">
