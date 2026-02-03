@@ -31,6 +31,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
     const [isPendingApproval, setIsPendingApproval] = useState(false);
 
+    // Função auxiliar para traduzir erros do Supabase
+    const translateAuthError = (message: string): string => {
+        if (message.includes('Invalid login credentials')) return 'Credenciais de login inválidas.';
+        if (message.includes('Email not confirmed')) return 'Email não confirmado.';
+        if (message.includes('User already registered') || message.includes('already registered')) return 'Usuário já cadastrado.';
+        if (message.includes('Password should be at least')) return 'A senha deve ter pelo menos 6 caracteres.';
+        if (message.includes('For security purposes, you can only request this once every')) return 'Por segurança, tente novamente em 60 segundos.';
+        return message;
+    };
+
     // Buscar permissões do usuário baseado no role_id
     const fetchUserPermissions = async (roleId: string | null): Promise<string[]> => {
         if (!roleId) return defaultPermissions;
@@ -241,7 +251,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Check status BEFORE logging in (optional, but supabase doesn't expose status publicly usually)
             // So we login first, then handleSession will catch pending status and logout/error.
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) return { success: false, message: error.message };
+            if (error) return { success: false, message: translateAuthError(error.message) };
 
             // handleSession will run via onAuthStateChange, but we can return success here.
             // However, if status is pending, we need to intercept.
@@ -289,7 +299,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 password,
                 options: { data: { name, role: 'usuario' } }
             });
-            if (error) return { success: false, message: error.message };
+            if (error) return { success: false, message: translateAuthError(error.message) };
 
             // Force logout if auto-logged in (which happens if confirm off)
             const { data: { session } } = await supabase.auth.getSession();
@@ -548,7 +558,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) throw error;
             return { success: true, message: 'Email de recuperação enviado.' };
         } catch (err: any) {
-            return { success: false, message: err.message || 'Erro ao enviar email.' };
+            return { success: false, message: translateAuthError(err.message || 'Erro ao enviar email.') };
         }
     };
 
@@ -561,7 +571,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error) throw error;
             return { success: true, message: 'Senha atualizada com sucesso.' };
         } catch (err: any) {
-            return { success: false, message: err.message || 'Erro ao atualizar senha.' };
+            return { success: false, message: translateAuthError(err.message || 'Erro ao atualizar senha.') };
         }
     };
 
