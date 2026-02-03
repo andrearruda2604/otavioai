@@ -278,7 +278,7 @@ export default function ChatPage() {
     const getStatusColor = (status?: string) => {
         const s = (status || '').toLowerCase();
         if (s.includes('deal') || s.includes('won')) return 'bg-green-100 text-green-700';
-        if (s.includes('cancel') || s.includes('lost')) return 'bg-rose-100 text-rose-700';
+        if (s.includes('cancel') || s.includes('lost')) return 'bg-slate-100 text-slate-600';
         if (s.includes('open') || s.includes('new')) return 'bg-blue-100 text-blue-700';
         return 'bg-slate-100 text-slate-500';
     };
