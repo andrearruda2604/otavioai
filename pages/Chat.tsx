@@ -97,7 +97,7 @@ export default function ChatPage() {
                 .from('count_messages')
                 .select('messages_counter')
                 .eq('id', 1)
-                .single();
+                .maybeSingle();
 
             if (msgData) {
                 setReceivedMessages(msgData.messages_counter || 0);
@@ -108,7 +108,7 @@ export default function ChatPage() {
                 .from('count_messages')
                 .select('messages_counter')
                 .eq('id', 2)
-                .single();
+                .maybeSingle();
 
             if (fupData) {
                 setFollowUpCount(fupData.messages_counter || 0);
