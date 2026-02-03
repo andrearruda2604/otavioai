@@ -65,7 +65,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="relative z-10 text-white/40 text-sm">
-                    © 2026 Otavio AI. Todos os direitos reservados.
+                    &copy; 2026 Num Chat AI. Todos os direitos reservados.
                 </div>
             </div>
 
