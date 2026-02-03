@@ -28,7 +28,7 @@ export default function LeadsPage() {
                         created_at
                     )
                 `)
-                .order('created_on', { ascending: false }); // Or last_message
+                .order('last_message', { ascending: false });
 
             // Search Filter
             if (searchTerm.trim()) {
