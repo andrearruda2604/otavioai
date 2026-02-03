@@ -281,7 +281,7 @@ export default function UserManagementPage() {
                                                         <select
                                                             value={userItem.role_id || ''}
                                                             onChange={(e) => handleRoleChange(userItem.id, e.target.value)}
-                                                            className={`px-3 py-1.5 rounded-lg text-sm font-medium border-0 cursor-pointer focus:ring-2 focus:ring-primary ${getRoleBadgeColor(userItem.roleName)}`}
+                                                            className={`pl-3 pr-8 py-1.5 rounded-lg text-sm font-medium border-0 cursor-pointer focus:ring-2 focus:ring-primary ${getRoleBadgeColor(userItem.roleName)}`}
                                                         >
                                                             {roles.map((r) => (
                                                                 <option key={r.id} value={r.id}>{r.name}</option>
