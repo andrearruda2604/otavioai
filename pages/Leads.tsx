@@ -3,11 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { ClientSession } from '../types/chat';
 
+type SortConfig = {
+    key: string;
+    direction: 'asc' | 'desc';
+};
+
 export default function LeadsPage() {
     const navigate = useNavigate();
     const [leads, setLeads] = useState<ClientSession[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 25;
+
+    // Sorting
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'name_first', direction: 'asc' });
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -28,6 +40,7 @@ export default function LeadsPage() {
                         created_at
                     )
                 `)
+                // We fetch all initially and sort/paginate on client to handle the complex 'latestStatus' logic + 'Empresa' column removal requests
                 .order('last_message', { ascending: false });
 
             // Search Filter
@@ -49,6 +62,7 @@ export default function LeadsPage() {
                     return { ...client, latestStatus: latest };
                 });
                 setLeads(processedData);
+                setCurrentPage(1); // Reset to first page on new search
             }
         } catch (error) {
             console.error('Error fetching leads:', error);
@@ -56,6 +70,42 @@ export default function LeadsPage() {
             setLoading(false);
         }
     };
+
+    const handleSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortedLeads = () => {
+        const sorted = [...leads].sort((a: any, b: any) => {
+            let aValue = a[sortConfig.key];
+            let bValue = b[sortConfig.key];
+
+            if (sortConfig.key === 'name') {
+                aValue = (a.name_first + ' ' + a.name_last).toLowerCase();
+                bValue = (b.name_first + ' ' + b.name_last).toLowerCase();
+            } else if (sortConfig.key === 'status') {
+                aValue = (a.latestStatus || '').toLowerCase();
+                bValue = (b.latestStatus || '').toLowerCase();
+            }
+
+            if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return sorted;
+    };
+
+    const getPaginatedLeads = () => {
+        const sorted = getSortedLeads();
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return sorted.slice(startIndex, startIndex + itemsPerPage);
+    };
+
+    const totalPages = Math.ceil(leads.length / itemsPerPage);
 
     const getStatusColor = (status?: string) => {
         const s = (status || '').toLowerCase();
@@ -86,7 +136,7 @@ export default function LeadsPage() {
                     <span className="material-icons-round absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
                     <input
                         className="w-full pl-10 pr-4 py-2.5 bg-background-light dark:bg-background-dark border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 dark:text-white"
-                        placeholder="Buscar por nome ou empresa..."
+                        placeholder="Buscar por nome..."
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -99,11 +149,46 @@ export default function LeadsPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                                <th className="px-6 py-4">Nome</th>
-                                <th className="px-6 py-4">Empresa</th>
-                                <th className="px-6 py-4">WhatsApp</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4 w-10">Chats</th>
+                                <th
+                                    className="px-6 py-4 cursor-pointer hover:text-primary transition-colors select-none"
+                                    onClick={() => handleSort('name')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Nome
+                                        {sortConfig.key === 'name' && (
+                                            <span className="material-icons-round text-sm">
+                                                {sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </th>
+                                <th
+                                    className="px-6 py-4 cursor-pointer hover:text-primary transition-colors select-none"
+                                    onClick={() => handleSort('whatsapp')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        WhatsApp
+                                        {sortConfig.key === 'whatsapp' && (
+                                            <span className="material-icons-round text-sm">
+                                                {sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </th>
+                                <th
+                                    className="px-6 py-4 cursor-pointer hover:text-primary transition-colors select-none"
+                                    onClick={() => handleSort('status')}
+                                >
+                                    <div className="flex items-center gap-1">
+                                        Status
+                                        {sortConfig.key === 'status' && (
+                                            <span className="material-icons-round text-sm">
+                                                {sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </th>
+                                <th className="px-6 py-4 w-10 text-center">Chats</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -120,13 +205,10 @@ export default function LeadsPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                leads.map((lead, i) => (
+                                getPaginatedLeads().map((lead, i) => (
                                     <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                         <td className="px-6 py-4 text-sm font-semibold dark:text-slate-200">
                                             {lead.name_first} {lead.name_last}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                                            {lead.company_name || '-'}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
@@ -165,8 +247,27 @@ export default function LeadsPage() {
                 </div>
                 {!loading && leads.length > 0 && (
                     <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
-                        <span>Mostrando {leads.length} resultados</span>
-                        {/* Pagination can be added later if needed */}
+                        <span>Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, leads.length)} - {Math.min(currentPage * itemsPerPage, leads.length)} de {leads.length} resultados</span>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                disabled={currentPage === 1}
+                                className="p-1 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span className="material-icons-round text-sm">chevron_left</span>
+                            </button>
+                            <span className="flex items-center px-2 font-medium">
+                                Página {currentPage} de {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                                className="p-1 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <span className="material-icons-round text-sm">chevron_right</span>
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
