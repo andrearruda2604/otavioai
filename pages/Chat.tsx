@@ -87,8 +87,8 @@ export default function ChatPage() {
             // 1. Total Leads (from clients table)
             const { count: contactCount } = await supabase
                 .from('clients')
-                .select('*', { count: 'exact', head: true })
-                .or('archived.is.null,archived.eq.false');
+                .select('*', { count: 'exact', head: true });
+            // Removed archived filter to match Leads page count
 
             setTotalLeads(contactCount || 0);
 
@@ -292,9 +292,9 @@ export default function ChatPage() {
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Acompanhe as conversas do agente com os clientes</p>
                 </div>
                 <div className="flex flex-wrap gap-4">
-                    <ChatStatCard title="Contatos" value={totalLeads.toString()} icon="group" color="blue" />
-                    <ChatStatCard title="Mensagens" value={receivedMessages.toString()} icon="chat" color="emerald" />
-                    <ChatStatCard title="Tempo Médio de Resposta" value={followUpCount.toString()} icon="schedule" color="indigo" />
+                    <ChatStatCard title="Leads" value={totalLeads.toString()} icon="group" color="blue" />
+                    <ChatStatCard title="Mensagens Recebidas" value={receivedMessages.toString()} icon="chat" color="emerald" />
+                    <ChatStatCard title="Follow Up" value={followUpCount.toString()} icon="send" color="indigo" />
                 </div>
             </header>
 
