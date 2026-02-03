@@ -121,28 +121,34 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                 Produtos Encontrados
                             </p>
                             <div className="space-y-3">
-                                {request.ordered_prods.filter(p => !p.not_found).map((prod, idx) => (
-                                    <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
+                                {request.ordered_prods.map((prod, idx) => (
+                                    <div key={idx} className={`rounded-lg overflow-hidden border ${prod.not_found ? 'bg-slate-50 border-slate-200 dark:bg-slate-800/30 dark:border-slate-700' : 'bg-white border-slate-200 dark:bg-slate-800 dark:border-slate-700'}`}>
                                         <div className="p-3 flex justify-between items-start">
                                             <div className="flex-1">
                                                 <p className="font-medium text-slate-800 dark:text-white text-sm">
                                                     {prod.stock_product_title || prod.prod_title || 'Produto sem nome'}
                                                 </p>
-                                                {prod.stock_unit_price && (
+                                                {prod.stock_unit_price ? (
                                                     <p className="text-sm font-semibold text-emerald-600">R$ {prod.stock_unit_price.toFixed(2).replace('.', ',')}</p>
+                                                ) : (
+                                                    <p className="text-xs text-slate-500 italic mt-1">
+                                                        {prod.not_found ? 'Item fora de estoque / Histórico' : 'Preço sob consulta'}
+                                                    </p>
                                                 )}
                                             </div>
-                                            <button
-                                                onClick={() => toggleProductExpansion(idx)}
-                                                className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1"
-                                            >
-                                                <span className="text-xs font-medium">Detalhes</span>
-                                                <span className={`material-icons-round text-sm transition-transform ${expandedProducts.has(idx) ? 'rotate-180' : ''}`}>
-                                                    expand_more
-                                                </span>
-                                            </button>
+                                            {!prod.not_found && (
+                                                <button
+                                                    onClick={() => toggleProductExpansion(idx)}
+                                                    className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1"
+                                                >
+                                                    <span className="text-xs font-medium">Detalhes</span>
+                                                    <span className={`material-icons-round text-sm transition-transform ${expandedProducts.has(idx) ? 'rotate-180' : ''}`}>
+                                                        expand_more
+                                                    </span>
+                                                </button>
+                                            )}
                                         </div>
-                                        {expandedProducts.has(idx) && (
+                                        {expandedProducts.has(idx) && !prod.not_found && (
                                             <div className="px-3 pb-3 pt-0 border-t border-slate-200 dark:border-slate-700 mt-2 space-y-2">
                                                 <div className="pt-2">
                                                     <p className="text-xs text-slate-400 mb-1">Produto no Estoque:</p>
@@ -188,24 +194,6 @@ export const PipelineDetailsSidebar: React.FC<PipelineDetailsSidebarProps> = ({
                                                 )}
                                             </div>
                                         )}
-                                    </div>
-                                ))}
-
-                                {/* Not found message */}
-                                {request.ordered_prods.filter(p => p.not_found).map((prod, idx) => (
-                                    <div key={`not-found-${idx}`} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                                        <div className="flex items-start gap-2">
-                                            <span className="material-icons-round text-amber-600 dark:text-amber-400 text-sm mt-0.5">warning</span>
-                                            <div className="flex-1">
-                                                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                                                    {prod.has_search_ids ? (
-                                                        <>Nenhum produto com {prod.search_prod_ids && prod.search_prod_ids.length > 1 ? 'os IDs' : 'o ID'} {prod.search_prod_ids?.join(', ')} ({prod.prod_title}) encontrado no estoque</>
-                                                    ) : (
-                                                        <>Não foi possível identificar um ID para o produto {prod.prod_title}</>
-                                                    )}
-                                                </p>
-                                            </div>
-                                        </div>
                                     </div>
                                 ))}
                             </div>
